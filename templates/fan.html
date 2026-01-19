@@ -1,0 +1,79 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>SalonSafe Fan Control</title>
+  <style>
+    body {
+      font-family: sans-serif;
+      text-align: center;
+      background: #f0faf9;
+      margin: 0;
+      padding: 2rem;
+    }
+    h1 {
+      color: #008080;
+    }
+    .buttons {
+      display: flex;
+      justify-content: center;
+      gap: 1rem;
+      margin-top: 2rem;
+      flex-wrap: wrap;
+    }
+    button {
+      font-size: 1.2rem;
+      padding: 1rem 2rem;
+      border: none;
+      border-radius: 8px;
+      color: white;
+      cursor: pointer;
+      min-width: 100px;
+    }
+    .off { background: #e74c3c; }
+    .medium { background: #f1c40f; }
+    .high { background: #2ecc71; }
+    #status {
+      margin-top: 2rem;
+      font-size: 1rem;
+      color: #333;
+    }
+  </style>
+</head>
+<body>
+  <h1>SalonSafe Fan Control</h1>
+  <div class="buttons">
+    <button class="off" onclick="setSpeed(0)">Off</button>
+    <button class="medium" onclick="setSpeed(50)">50%</button>
+    <button class="high" onclick="setSpeed(100)">100%</button>
+  </div>
+  <div id="status"></div>
+
+  <script>
+    async function setSpeed(speed) {
+      const statusDiv = document.getElementById('status');
+      statusDiv.textContent = `Sending ${speed}%...`;
+
+      try {
+        const response = await fetch('http://192.168.0.150:5000/api/fan', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ speed })
+        });
+
+        if (!response.ok) {
+          const err = await response.text();
+          throw new Error(err || 'Failed to send fan speed');
+        }
+
+        const result = await response.json();
+        statusDiv.textContent = `✅ Fan set to ${speed}%`;
+      } catch (error) {
+        console.error(error);
+        statusDiv.textContent = '❌ Failed to send command';
+      }
+    }
+  </script>
+</body>
+</html>

@@ -1,0 +1,16 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>SalonSafe WiFi Setup</title>
+</head>
+<body>
+  <h1>SalonSafe Device Setup</h1>
+  <form action="/api/iot/connect-wifi" method="POST">
+    <label>WiFi SSID:</label><br>
+    <input type="text" name="ssid" required><br><br>
+    <label>Password:</label><br>
+    <input type="password" name="password" required><br><br>
+    <button type="submit">Connect</button>
+  </form>
+</body>
+</html>
