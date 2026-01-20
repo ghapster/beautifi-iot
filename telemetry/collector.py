@@ -245,7 +245,7 @@ class TelemetryCollector:
         }
 
         self._store_epoch(epoch)
-        print(f"📦 Epoch finalized: {epoch['epoch_id']} - {epoch['summary']['total_tar_cfm_min']} TAR")
+        print(f"[EPOCH] Epoch finalized: {epoch['epoch_id']} - {epoch['summary']['total_tar_cfm_min']} TAR")
 
         # Reset for next epoch
         self._current_epoch_start = None
@@ -253,7 +253,7 @@ class TelemetryCollector:
 
     def _collection_loop(self):
         """Main collection loop running in background thread."""
-        print(f"🚀 Telemetry collector started (interval: {SAMPLE_INTERVAL_SECONDS}s)")
+        print(f">> Telemetry collector started (interval: {SAMPLE_INTERVAL_SECONDS}s)")
 
         while self._running:
             try:
@@ -274,14 +274,14 @@ class TelemetryCollector:
                     try:
                         callback(sample)
                     except Exception as e:
-                        print(f"⚠️ Callback error: {e}")
+                        print(f"[WARN] Callback error: {e}")
 
                 # Log periodically
-                print(f"📊 Sample: CFM={sample['fan']['cfm']}, VOC={sample['environment']['voc_ppb']}ppb, "
+                print(f"[DATA] Sample: CFM={sample['fan']['cfm']}, VOC={sample['environment']['voc_ppb']}ppb, "
                       f"PWM={current_pwm}%")
 
             except Exception as e:
-                print(f"❌ Collection error: {e}")
+                print(f"[ERR] Collection error: {e}")
 
             # Wait for next sample
             time.sleep(SAMPLE_INTERVAL_SECONDS)
@@ -306,7 +306,7 @@ class TelemetryCollector:
         if self._current_epoch_samples:
             self._finalize_epoch()
 
-        print("🛑 Telemetry collector stopped")
+        print("[STOP] Telemetry collector stopped")
 
     def add_callback(self, callback: Callable[[dict], None]):
         """Add a callback function to receive real-time samples."""
@@ -359,7 +359,7 @@ if __name__ == "__main__":
     )
 
     # Add a print callback
-    collector.add_callback(lambda s: print(f"  → Callback received: VOC={s['environment']['voc_ppb']}"))
+    collector.add_callback(lambda s: print(f"  -> Callback received: VOC={s['environment']['voc_ppb']}"))
 
     collector.start()
     time.sleep(15)  # Collect a few samples

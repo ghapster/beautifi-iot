@@ -47,12 +47,12 @@ try:
         pwm = GPIO.PWM(pin, PWM_FREQUENCY)
         pwm.start(0)
         pwms[name] = pwm
-        print(f"✅ {name} initialized on GPIO{pin}")
+        print(f"[OK] {name} initialized on GPIO{pin}")
 
     RUNNING_ON_PI = True
 except (ImportError, RuntimeError) as e:
-    print(f"⚠️ GPIO not available (not on Pi or no permissions): {e}")
-    print("   Running in simulation-only mode")
+    print(f"[WARN] GPIO not available (not on Pi or no permissions): {e}")
+    print("       Running in simulation-only mode")
     RUNNING_ON_PI = False
 
     def apply_wifi_settings(ssid, password):
@@ -128,11 +128,11 @@ def set_fan_speed():
 
         def ramp():
             delay_between = 5  # seconds between staggered starts
-            print(f"🚀 Setting all fans to {speed}%")
+            print(f">> Setting all fans to {speed}%")
 
             for i, (name, _) in enumerate(FAN_PWM_PINS.items()):
                 time.sleep(i * delay_between)
-                print(f"  {name} → {speed}%")
+                print(f"  {name} -> {speed}%")
                 current_speeds[name] = speed
 
                 if RUNNING_ON_PI and name in pwms:
@@ -152,7 +152,7 @@ def set_fan_speed():
         })
 
     except Exception as e:
-        print(f"❌ Fan control error: {e}")
+        print(f"[ERR] Fan control error: {e}")
         return jsonify({"error": str(e)}), 500
 
 
@@ -278,7 +278,7 @@ def get_fan_table():
 
 def cleanup():
     """Clean up GPIO and stop telemetry on exit."""
-    print("\n🧹 Cleaning up...")
+    print("\n[CLEAN] Cleaning up...")
 
     # Stop telemetry
     telemetry_collector.stop()
@@ -289,9 +289,9 @@ def cleanup():
             pwm.ChangeDutyCycle(0)
             pwm.stop()
         GPIO.cleanup()
-        print("✅ GPIO cleaned up")
+        print("[OK] GPIO cleaned up")
 
-    print("👋 Goodbye!")
+    print("[BYE] Goodbye!")
 
 
 atexit.register(cleanup)
