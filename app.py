@@ -385,6 +385,49 @@ def get_verifications():
 
 
 # ============================================
+# ROUTES - Security / Anomaly Detection
+# ============================================
+
+@app.route('/api/security/status', methods=['GET'])
+def security_status():
+    """Get anomaly detection status."""
+    status = telemetry_collector.get_anomaly_status()
+    if status is None:
+        return jsonify({
+            "enabled": False,
+            "message": "Anomaly detection is disabled",
+        })
+
+    return jsonify({
+        "enabled": True,
+        **status,
+    })
+
+
+@app.route('/api/security/baselines', methods=['GET'])
+def security_baselines():
+    """Get current baseline statistics for all sensors."""
+    baselines = telemetry_collector.get_anomaly_baselines()
+    if baselines is None:
+        return jsonify({"error": "Anomaly detection is disabled"}), 400
+
+    return jsonify({
+        "fields": baselines,
+    })
+
+
+@app.route('/api/security/anomalies', methods=['GET'])
+def get_anomalies():
+    """Get recent anomalies detected."""
+    limit = request.args.get('limit', 50, type=int)
+    anomalies = telemetry_collector.get_recent_anomalies(limit)
+    return jsonify({
+        "count": len(anomalies),
+        "anomalies": anomalies,
+    })
+
+
+# ============================================
 # ROUTES - Sensors (Direct Access)
 # ============================================
 

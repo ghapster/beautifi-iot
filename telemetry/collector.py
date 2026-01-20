@@ -30,6 +30,15 @@ except ImportError as e:
     print(f"[WARN] Crypto module not available: {e}")
     CRYPTO_AVAILABLE = False
 
+# Security imports (with graceful fallback)
+try:
+    from security import AnomalyDetector
+    SECURITY_AVAILABLE = True
+except ImportError as e:
+    print(f"[WARN] Security module not available: {e}")
+    SECURITY_AVAILABLE = False
+    AnomalyDetector = None
+
 
 class TelemetryCollector:
     """
@@ -48,6 +57,7 @@ class TelemetryCollector:
         db_path: str = "telemetry.db",
         pwm_getter: Optional[Callable[[], float]] = None,
         enable_signing: bool = True,
+        enable_anomaly_detection: bool = True,
     ):
         """
         Initialize the telemetry collector.
@@ -56,10 +66,12 @@ class TelemetryCollector:
             db_path: Path to SQLite database for buffering
             pwm_getter: Callback function that returns current PWM (0-100)
             enable_signing: Enable cryptographic signing of samples/epochs
+            enable_anomaly_detection: Enable anomaly detection on samples
         """
         self.db_path = db_path
         self.pwm_getter = pwm_getter or (lambda: 0)
         self.enable_signing = enable_signing and CRYPTO_AVAILABLE
+        self.enable_anomaly_detection = enable_anomaly_detection and SECURITY_AVAILABLE
 
         # Initialize device identity if signing is enabled
         self._identity: Optional[DeviceIdentity] = None
@@ -70,6 +82,20 @@ class TelemetryCollector:
             except Exception as e:
                 print(f"[WARN] Failed to load device identity: {e}")
                 self.enable_signing = False
+
+        # Initialize anomaly detector if enabled
+        self._anomaly_detector = None
+        if self.enable_anomaly_detection:
+            try:
+                self._anomaly_detector = AnomalyDetector(
+                    db_path="anomaly.db",
+                    sigma_threshold=3.0,
+                )
+                # Try to load existing baselines
+                self._anomaly_detector.load_baselines()
+            except Exception as e:
+                print(f"[WARN] Failed to initialize anomaly detector: {e}")
+                self.enable_anomaly_detection = False
 
         # Initialize sensors (simulation or real based on config)
         self.fan_interpolator = FanInterpolator()
@@ -357,7 +383,8 @@ class TelemetryCollector:
     def _collection_loop(self):
         """Main collection loop running in background thread."""
         signing_status = "enabled" if self.enable_signing else "disabled"
-        print(f">> Telemetry collector started (interval: {SAMPLE_INTERVAL_SECONDS}s, signing: {signing_status})")
+        anomaly_status = "enabled" if self.enable_anomaly_detection else "disabled"
+        print(f">> Telemetry collector started (interval: {SAMPLE_INTERVAL_SECONDS}s, signing: {signing_status}, anomaly: {anomaly_status})")
 
         while self._running:
             try:
@@ -367,7 +394,20 @@ class TelemetryCollector:
                 # Read sensors
                 sample = self.sensors.read_all(current_pwm)
 
-                # Sign the sample
+                # Check for anomalies before signing
+                anomaly_flags = []
+                if self.enable_anomaly_detection and self._anomaly_detector:
+                    anomalies = self._anomaly_detector.check_sample(sample)
+                    if anomalies:
+                        # Add anomaly flags to sample
+                        anomaly_flags = [a.to_dict() for a in anomalies]
+                        sample["_anomalies"] = {
+                            "count": len(anomalies),
+                            "has_critical": self._anomaly_detector.has_critical_anomalies(anomalies),
+                            "types": list(set(a.anomaly_type.value for a in anomalies)),
+                        }
+
+                # Sign the sample (includes anomaly flags in signature)
                 sample = self._sign_sample(sample)
 
                 # Store locally
@@ -383,9 +423,10 @@ class TelemetryCollector:
                     except Exception as e:
                         print(f"[WARN] Callback error: {e}")
 
-                # Log periodically (include signature status)
+                # Log periodically (include signature and anomaly status)
                 sig_indicator = "[S]" if '_signing' in sample else ""
-                print(f"[DATA]{sig_indicator} Sample: CFM={sample['fan']['cfm']}, "
+                anomaly_indicator = "[!]" if anomaly_flags else ""
+                print(f"[DATA]{sig_indicator}{anomaly_indicator} Sample: CFM={sample['fan']['cfm']}, "
                       f"VOC={sample['environment']['voc_ppb']}ppb, PWM={current_pwm}%")
 
             except Exception as e:
@@ -413,6 +454,10 @@ class TelemetryCollector:
         # Finalize any partial epoch
         if self._current_epoch_samples:
             self._finalize_epoch()
+
+        # Save anomaly baselines
+        if self._anomaly_detector:
+            self._anomaly_detector.save_baselines()
 
         print("[STOP] Telemetry collector stopped")
 
@@ -464,6 +509,24 @@ class TelemetryCollector:
         if self._identity:
             return self._identity.get_identity_info()
         return None
+
+    def get_anomaly_status(self) -> Optional[dict]:
+        """Get anomaly detector status."""
+        if self._anomaly_detector:
+            return self._anomaly_detector.get_status()
+        return None
+
+    def get_anomaly_baselines(self) -> Optional[dict]:
+        """Get anomaly detector baseline statistics."""
+        if self._anomaly_detector:
+            return self._anomaly_detector.get_baseline_stats()
+        return None
+
+    def get_recent_anomalies(self, limit: int = 50) -> List[dict]:
+        """Get recent anomalies from the detector."""
+        if self._anomaly_detector:
+            return self._anomaly_detector.get_recent_anomalies(limit)
+        return []
 
 
 # Quick test
