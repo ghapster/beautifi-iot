@@ -22,6 +22,8 @@ from config import (
     VERIFIER_API_KEY,
     SYNC_INTERVAL_SECONDS,
     ENABLE_VERIFIER_SYNC,
+    BACKEND_URL,
+    CALIBRATION_DURATION_MINUTES,
 )
 
 # Telemetry
@@ -30,6 +32,9 @@ from sensors import FanInterpolator
 
 # Network / Verifier
 from network import VerifierClient
+
+# Registration
+from registration import CommissioningManager, RegistrationClient, HardwareManifest
 
 # --- Flask Setup ---
 app = Flask(__name__, template_folder='templates')
@@ -106,6 +111,14 @@ if ENABLE_VERIFIER_SYNC:
     telemetry_collector.set_epoch_callback(on_epoch_complete)
 
     print(f"[VERIFIER] Streaming enabled to {VERIFIER_URL}")
+
+# --- Registration / Commissioning ---
+commissioning_manager = CommissioningManager(db_path="commissioning.db")
+registration_client = RegistrationClient(
+    backend_url=BACKEND_URL,
+    device_id=DEVICE_ID,
+)
+print(f"[REGISTER] Backend: {BACKEND_URL}")
 
 
 # ============================================
@@ -424,6 +437,134 @@ def get_anomalies():
     return jsonify({
         "count": len(anomalies),
         "anomalies": anomalies,
+    })
+
+
+# ============================================
+# ROUTES - Registration / Commissioning
+# ============================================
+
+@app.route('/api/registration/status', methods=['GET'])
+def registration_status():
+    """Get commissioning/registration status."""
+    return jsonify(commissioning_manager.get_status())
+
+
+@app.route('/api/registration/manifest', methods=['GET'])
+def get_manifest():
+    """Get hardware manifest."""
+    manifest_gen = HardwareManifest()
+    manifest = manifest_gen.generate()
+    return jsonify(manifest)
+
+
+@app.route('/api/registration/calibrate', methods=['POST'])
+def start_calibration():
+    """Start baseline calibration."""
+    data = request.get_json() or {}
+    duration = data.get('duration_minutes', CALIBRATION_DURATION_MINUTES)
+
+    # Create sensor reader that uses current telemetry setup
+    def sensor_reader():
+        from sensors import SimulatedSensors
+        sensors = SimulatedSensors(fan_interpolator)
+        return sensors.read_all(get_average_pwm())
+
+    success = commissioning_manager.start_calibration(
+        duration_minutes=duration,
+        sensor_reader=sensor_reader,
+    )
+
+    if success:
+        return jsonify({
+            "status": "calibration_started",
+            "duration_minutes": duration,
+        })
+    else:
+        return jsonify({
+            "error": "Could not start calibration",
+            "current_state": commissioning_manager.state.value,
+        }), 400
+
+
+@app.route('/api/registration/calibrate/stop', methods=['POST'])
+def stop_calibration():
+    """Stop calibration early."""
+    commissioning_manager.stop_calibration()
+    return jsonify({
+        "status": "calibration_stopped",
+        "state": commissioning_manager.state.value,
+    })
+
+
+@app.route('/api/registration/register', methods=['POST'])
+def register_device():
+    """Submit device registration to backend."""
+    data = request.get_json()
+
+    if not data:
+        return jsonify({"error": "Request body required"}), 400
+
+    required_fields = ['wallet_address', 'salon_name', 'location', 'email']
+    missing = [f for f in required_fields if f not in data]
+    if missing:
+        return jsonify({"error": f"Missing required fields: {missing}"}), 400
+
+    success = commissioning_manager.register(
+        wallet_address=data['wallet_address'],
+        salon_name=data['salon_name'],
+        location=data['location'],
+        email=data['email'],
+        backend_client=registration_client,
+        reseller=data.get('reseller', ''),
+        installer=data.get('installer', ''),
+        manicure_stations=data.get('manicure_stations', 0),
+        pedicure_stations=data.get('pedicure_stations', 0),
+        comments=data.get('comments', ''),
+    )
+
+    if success:
+        return jsonify({
+            "status": "registration_submitted",
+            "registration_id": commissioning_manager._registration_id,
+            "message": "Registration submitted. Awaiting admin approval.",
+        })
+    else:
+        return jsonify({
+            "error": "Registration failed",
+            "state": commissioning_manager.state.value,
+        }), 500
+
+
+@app.route('/api/registration/check-approval', methods=['GET'])
+def check_approval():
+    """Check if registration has been approved."""
+    is_approved = commissioning_manager.check_approval(registration_client)
+
+    return jsonify({
+        "approved": is_approved,
+        "state": commissioning_manager.state.value,
+        "nft_binding": commissioning_manager.nft_binding,
+    })
+
+
+@app.route('/api/registration/reset', methods=['POST'])
+def reset_registration():
+    """Reset commissioning state (for re-registration)."""
+    commissioning_manager.reset()
+    return jsonify({
+        "status": "reset",
+        "state": commissioning_manager.state.value,
+    })
+
+
+@app.route('/api/registration/backend-ping', methods=['GET'])
+def ping_backend():
+    """Check if backend is reachable."""
+    is_online = registration_client.ping()
+    return jsonify({
+        "backend_url": BACKEND_URL,
+        "online": is_online,
     })
 
 

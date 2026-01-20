@@ -123,6 +123,19 @@ SYNC_INTERVAL_SECONDS = 30  # How often to retry buffered data
 ENABLE_VERIFIER_SYNC = True  # Set False to disable verifier streaming
 
 # ============================================
+# REGISTRATION / BACKEND SETTINGS
+# ============================================
+BACKEND_URL = "https://salon-safe-backend.onrender.com"  # SalonSafe backend API
+
+# Blockchain (BSC Testnet)
+BSC_RPC_URL = "https://data-seed-prebsc-1-s1.binance.org:8545/"
+TOKEN_CONTRACT_ADDRESS = "0x039a5E5Aa286157ccB84378e26Ea702929DA540c"  # SLN Token
+NFT_CONTRACT_ADDRESS = "0x6708c25adeca86eeb36b7c5520f5c5d7faf91e69"  # Certificate NFT
+
+# Calibration
+CALIBRATION_DURATION_MINUTES = 30  # Default baseline calibration duration
+
+# ============================================
 # GPIO PIN MAPPING
 # ============================================
 FAN_PWM_PINS = {
