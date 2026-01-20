@@ -213,7 +213,7 @@ GET  /api/device/{id}/status   - Verification status
 
 ---
 
-## Phase 6: Device Registration & Site NFT 🎫
+## Phase 6: Device Registration & Site NFT ✅
 
 **Goal:** On-chain device commissioning and Site NFT binding.
 
@@ -226,19 +226,27 @@ GET  /api/device/{id}/status   - Verification status
 
 ### Software Tasks
 
-- [ ] Create `registration/` module
-- [ ] Implement commissioning flow:
+- [x] Create `registration/` module
+- [x] Implement commissioning flow:
   1. Generate device identity
   2. Run baseline calibration (30-min)
   3. Submit registration to backend
   4. Receive Site NFT binding confirmation
-- [ ] Store Site NFT ID locally
-- [ ] Add `/api/registration` endpoint
+- [x] Store Site NFT ID locally
+- [x] Add `/api/registration` endpoint
 - [ ] Create commissioning UI page
+
+### Implementation
+
+- `registration/manifest.py` - Hardware manifest generation
+- `registration/backend_client.py` - SalonSafe backend API client
+- `registration/commissioning.py` - Commissioning state machine
+- 8 API endpoints: `/api/registration/*`
+- SQLite persistence for commissioning state
 
 ---
 
-## Phase 7: Anti-Tamper & Anomaly Detection 🛡️
+## Phase 7: Anti-Tamper & Anomaly Detection ✅
 
 **Goal:** Local detection of suspicious behavior.
 
@@ -251,14 +259,21 @@ GET  /api/device/{id}/status   - Verification status
 
 ### Software Tasks
 
-- [ ] Create `security/anomaly.py` - Local anomaly detection
-- [ ] Implement checks:
+- [x] Create `security/anomaly.py` - Local anomaly detection
+- [x] Implement checks:
   - Reading within ±3σ of baseline
   - No sudden mode switches
   - Timestamp monotonicity
   - Cross-sensor consistency (CFM vs power vs RPM)
-- [ ] Flag suspicious epochs before submission
-- [ ] Log all anomalies locally
+- [x] Flag suspicious epochs before submission
+- [x] Log all anomalies locally
+
+### Implementation
+
+- `security/anomaly.py` - AnomalyDetector with statistical outlier detection
+- Physical limits validation, flatline detection, replay attack detection
+- Cross-sensor consistency checks (CFM/RPM/power correlation)
+- 3 API endpoints: `/api/security/*`
 
 ---
 
@@ -278,16 +293,17 @@ GET  /api/device/{id}/status   - Verification status
 
 ## Implementation Timeline
 
-| Phase | Description | Priority | Dependencies |
-|-------|-------------|----------|--------------|
-| 1 | Sensor Integration | 🔴 High | Hardware procurement |
-| 2 | Telemetry Collection | 🔴 High | Phase 1 |
-| 3 | Device Identity | 🔴 High | None |
-| 4 | Epoch Formation | 🔴 High | Phases 2, 3 |
-| 5 | Verifier Integration | 🟡 Medium | Phase 4, Backend ready |
-| 6 | Registration & Site NFT | 🟡 Medium | Phase 3, Smart contracts |
-| 7 | Anti-Tamper | 🟢 Low | Phase 2 |
-| 8 | OTA Updates | 🟢 Low | Phase 3 |
+| Phase | Description | Status | Dependencies |
+|-------|-------------|--------|--------------|
+| 0 | Fan Control MVP | ✅ Complete | None |
+| 1 | Sensor Integration | ✅ Complete (Simulation) | Hardware procurement |
+| 2 | Telemetry Collection | ✅ Complete | Phase 1 |
+| 3 | Device Identity | ✅ Complete | None |
+| 4 | Epoch Formation | ✅ Complete | Phases 2, 3 |
+| 5 | Verifier Integration | ✅ Complete | Phase 4, Backend ready |
+| 6 | Registration & Site NFT | ✅ Complete | Phase 3, Smart contracts |
+| 7 | Anti-Tamper | ✅ Complete | Phase 2 |
+| 8 | OTA Updates | 🟡 Pending | Phase 3 |
 
 ---
 
