@@ -259,6 +259,50 @@ def connect_wifi():
 
 
 # ============================================
+# ROUTES - Device Identity (Crypto)
+# ============================================
+
+@app.route('/api/identity', methods=['GET'])
+def get_identity():
+    """Get device cryptographic identity."""
+    identity_info = telemetry_collector.get_device_identity_info()
+    if identity_info:
+        return jsonify({
+            "status": "ok",
+            "signing_enabled": True,
+            **identity_info,
+        })
+    else:
+        return jsonify({
+            "status": "unavailable",
+            "signing_enabled": False,
+            "message": "Cryptographic identity not available",
+        })
+
+
+@app.route('/api/telemetry/verify', methods=['POST'])
+def verify_sample():
+    """Verify a signed telemetry sample."""
+    try:
+        from crypto import verify_signature
+        sample = request.get_json()
+
+        if '_signing' not in sample:
+            return jsonify({"valid": False, "message": "No signature present"}), 400
+
+        is_valid, message = verify_signature(sample)
+        return jsonify({
+            "valid": is_valid,
+            "message": message,
+            "payload_hash": sample['_signing'].get('payload_hash'),
+        })
+    except ImportError:
+        return jsonify({"error": "Crypto module not available"}), 500
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+
+# ============================================
 # ROUTES - Sensors (Direct Access)
 # ============================================
 

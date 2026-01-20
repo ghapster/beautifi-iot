@@ -2,6 +2,7 @@
 """
 Telemetry collection service for BeautiFi IoT.
 Samples sensor data at configured intervals and buffers locally.
+Includes cryptographic signing for DUAN Proof-of-Air compliance.
 """
 
 import threading
@@ -21,6 +22,14 @@ from config import (
 )
 from sensors import SimulatedSensors, FanInterpolator
 
+# Crypto imports (with graceful fallback)
+try:
+    from crypto import sign_payload, sign_epoch, DeviceIdentity, get_device_identity
+    CRYPTO_AVAILABLE = True
+except ImportError as e:
+    print(f"[WARN] Crypto module not available: {e}")
+    CRYPTO_AVAILABLE = False
+
 
 class TelemetryCollector:
     """
@@ -30,6 +39,7 @@ class TelemetryCollector:
     - Configurable sampling interval (default 12 seconds)
     - SQLite buffer for local storage
     - Epoch formation (bundles samples into 1-hour epochs)
+    - Cryptographic signing of samples and epochs
     - Callback support for real-time streaming
     """
 
@@ -37,6 +47,7 @@ class TelemetryCollector:
         self,
         db_path: str = "telemetry.db",
         pwm_getter: Optional[Callable[[], float]] = None,
+        enable_signing: bool = True,
     ):
         """
         Initialize the telemetry collector.
@@ -44,9 +55,21 @@ class TelemetryCollector:
         Args:
             db_path: Path to SQLite database for buffering
             pwm_getter: Callback function that returns current PWM (0-100)
+            enable_signing: Enable cryptographic signing of samples/epochs
         """
         self.db_path = db_path
         self.pwm_getter = pwm_getter or (lambda: 0)
+        self.enable_signing = enable_signing and CRYPTO_AVAILABLE
+
+        # Initialize device identity if signing is enabled
+        self._identity: Optional[DeviceIdentity] = None
+        if self.enable_signing:
+            try:
+                self._identity = get_device_identity()
+                print(f"[CRYPTO] Device identity loaded: {self._identity.device_id}")
+            except Exception as e:
+                print(f"[WARN] Failed to load device identity: {e}")
+                self.enable_signing = False
 
         # Initialize sensors (simulation or real based on config)
         self.fan_interpolator = FanInterpolator()
@@ -76,7 +99,7 @@ class TelemetryCollector:
         conn = sqlite3.connect(self.db_path)
         cursor = conn.cursor()
 
-        # Telemetry samples table
+        # Telemetry samples table (with signing columns)
         cursor.execute("""
             CREATE TABLE IF NOT EXISTS samples (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -92,12 +115,14 @@ class TelemetryCollector:
                 humidity_pct REAL,
                 delta_p_pa REAL,
                 tar_cfm_min REAL,
+                payload_hash TEXT,
+                signature TEXT,
                 raw_json TEXT,
                 created_at TEXT DEFAULT CURRENT_TIMESTAMP
             )
         """)
 
-        # Epochs table
+        # Epochs table (with signing columns)
         cursor.execute("""
             CREATE TABLE IF NOT EXISTS epochs (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -111,25 +136,69 @@ class TelemetryCollector:
                 avg_watts REAL,
                 avg_voc REAL,
                 total_energy_wh REAL,
+                merkle_root TEXT,
+                epoch_hash TEXT,
+                signature TEXT,
                 summary_json TEXT,
                 created_at TEXT DEFAULT CURRENT_TIMESTAMP
             )
         """)
 
+        # Add columns if they don't exist (for db migration)
+        try:
+            cursor.execute("ALTER TABLE samples ADD COLUMN payload_hash TEXT")
+        except sqlite3.OperationalError:
+            pass
+        try:
+            cursor.execute("ALTER TABLE samples ADD COLUMN signature TEXT")
+        except sqlite3.OperationalError:
+            pass
+        try:
+            cursor.execute("ALTER TABLE epochs ADD COLUMN merkle_root TEXT")
+        except sqlite3.OperationalError:
+            pass
+        try:
+            cursor.execute("ALTER TABLE epochs ADD COLUMN epoch_hash TEXT")
+        except sqlite3.OperationalError:
+            pass
+        try:
+            cursor.execute("ALTER TABLE epochs ADD COLUMN signature TEXT")
+        except sqlite3.OperationalError:
+            pass
+
         conn.commit()
         conn.close()
+
+    def _sign_sample(self, sample: dict) -> dict:
+        """Sign a telemetry sample if signing is enabled."""
+        if not self.enable_signing or self._identity is None:
+            return sample
+
+        try:
+            signed = sign_payload(sample, self._identity)
+            return signed
+        except Exception as e:
+            print(f"[WARN] Failed to sign sample: {e}")
+            return sample
 
     def _store_sample(self, sample: dict):
         """Store a telemetry sample in the database."""
         conn = sqlite3.connect(self.db_path)
         cursor = conn.cursor()
 
+        # Extract signing info if present
+        payload_hash = None
+        signature = None
+        if '_signing' in sample:
+            payload_hash = sample['_signing'].get('payload_hash')
+            signature = sample['_signing'].get('signature')
+
         cursor.execute("""
             INSERT INTO samples (
                 timestamp, device_id, pwm_percent, cfm, rpm, watts,
                 voc_ppb, co2_ppm, temperature_c, humidity_pct, delta_p_pa,
-                tar_cfm_min, raw_json
-            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                tar_cfm_min, payload_hash, signature, raw_json
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         """, (
             sample["timestamp"],
             sample["device_id"],
@@ -143,6 +212,8 @@ class TelemetryCollector:
             sample["environment"]["humidity_pct"],
             sample["environment"]["delta_p_pa"],
             sample["derived"]["tar_cfm_min"],
+            payload_hash,
+            signature,
             json.dumps(sample),
         ))
 
@@ -166,11 +237,20 @@ class TelemetryCollector:
         conn = sqlite3.connect(self.db_path)
         cursor = conn.cursor()
 
+        # Extract signing info if present
+        merkle_root = epoch.get('merkle_root')
+        epoch_hash = None
+        signature = None
+        if '_signing' in epoch:
+            epoch_hash = epoch['_signing'].get('epoch_hash')
+            signature = epoch['_signing'].get('signature')
+
         cursor.execute("""
             INSERT OR REPLACE INTO epochs (
                 epoch_id, device_id, start_time, end_time, sample_count,
-                total_tar, avg_cfm, avg_watts, avg_voc, total_energy_wh, summary_json
-            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                total_tar, avg_cfm, avg_watts, avg_voc, total_energy_wh,
+                merkle_root, epoch_hash, signature, summary_json
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         """, (
             epoch["epoch_id"],
             epoch["device_id"],
@@ -182,6 +262,9 @@ class TelemetryCollector:
             epoch["summary"]["avg_watts"],
             epoch["summary"]["avg_voc_ppb"],
             epoch["summary"]["total_energy_wh"],
+            merkle_root,
+            epoch_hash,
+            signature,
             json.dumps(epoch),
         ))
 
@@ -205,7 +288,7 @@ class TelemetryCollector:
             self._finalize_epoch()
 
     def _finalize_epoch(self):
-        """Finalize the current epoch and store it."""
+        """Finalize the current epoch, sign it, and store it."""
         if not self._current_epoch_samples:
             return
 
@@ -227,12 +310,12 @@ class TelemetryCollector:
         eligible_samples = [s for s in samples if s["fan"]["cfm"] > 0]
         eligible_minutes = len(eligible_samples) * (SAMPLE_INTERVAL_SECONDS / 60)
 
-        epoch = {
+        # Build epoch data
+        epoch_data = {
             "epoch_id": f"ep-{start_time.strftime('%Y%m%d%H')}-{DEVICE_ID}",
             "device_id": DEVICE_ID,
             "start_time": start_time.isoformat() + "Z",
             "end_time": end_time.isoformat() + "Z",
-            "sample_count": len(samples),
             "summary": {
                 "total_tar_cfm_min": round(total_tar, 1),
                 "eligible_minutes": round(eligible_minutes, 1),
@@ -244,8 +327,20 @@ class TelemetryCollector:
             },
         }
 
+        # Sign the epoch if enabled
+        if self.enable_signing and self._identity is not None:
+            try:
+                epoch = sign_epoch(epoch_data, samples, self._identity)
+                print(f"[EPOCH] Signed epoch: {epoch['epoch_id']}")
+                print(f"        Merkle root: {epoch['merkle_root'][:32]}...")
+                print(f"        Samples: {epoch['sample_count']}, TAR: {epoch['summary']['total_tar_cfm_min']}")
+            except Exception as e:
+                print(f"[WARN] Failed to sign epoch: {e}")
+                epoch = {**epoch_data, "sample_count": len(samples)}
+        else:
+            epoch = {**epoch_data, "sample_count": len(samples)}
+
         self._store_epoch(epoch)
-        print(f"[EPOCH] Epoch finalized: {epoch['epoch_id']} - {epoch['summary']['total_tar_cfm_min']} TAR")
 
         # Reset for next epoch
         self._current_epoch_start = None
@@ -253,7 +348,8 @@ class TelemetryCollector:
 
     def _collection_loop(self):
         """Main collection loop running in background thread."""
-        print(f">> Telemetry collector started (interval: {SAMPLE_INTERVAL_SECONDS}s)")
+        signing_status = "enabled" if self.enable_signing else "disabled"
+        print(f">> Telemetry collector started (interval: {SAMPLE_INTERVAL_SECONDS}s, signing: {signing_status})")
 
         while self._running:
             try:
@@ -262,6 +358,9 @@ class TelemetryCollector:
 
                 # Read sensors
                 sample = self.sensors.read_all(current_pwm)
+
+                # Sign the sample
+                sample = self._sign_sample(sample)
 
                 # Store locally
                 self._store_sample(sample)
@@ -276,9 +375,10 @@ class TelemetryCollector:
                     except Exception as e:
                         print(f"[WARN] Callback error: {e}")
 
-                # Log periodically
-                print(f"[DATA] Sample: CFM={sample['fan']['cfm']}, VOC={sample['environment']['voc_ppb']}ppb, "
-                      f"PWM={current_pwm}%")
+                # Log periodically (include signature status)
+                sig_indicator = "[S]" if '_signing' in sample else ""
+                print(f"[DATA]{sig_indicator} Sample: CFM={sample['fan']['cfm']}, "
+                      f"VOC={sample['environment']['voc_ppb']}ppb, PWM={current_pwm}%")
 
             except Exception as e:
                 print(f"[ERR] Collection error: {e}")
@@ -347,24 +447,33 @@ class TelemetryCollector:
 
         return [json.loads(row[0]) for row in reversed(rows)]
 
+    def get_device_identity_info(self) -> Optional[dict]:
+        """Get device identity information."""
+        if self._identity:
+            return self._identity.get_identity_info()
+        return None
+
 
 # Quick test
 if __name__ == "__main__":
-    print("Testing TelemetryCollector (5 samples at 50% PWM)")
+    print("Testing TelemetryCollector with signing")
     print("=" * 60)
 
     collector = TelemetryCollector(
         db_path="test_telemetry.db",
-        pwm_getter=lambda: 50  # Fixed 50% for testing
+        pwm_getter=lambda: 50,  # Fixed 50% for testing
+        enable_signing=True,
     )
 
-    # Add a print callback
-    collector.add_callback(lambda s: print(f"  -> Callback received: VOC={s['environment']['voc_ppb']}"))
+    print(f"\nDevice Identity: {collector.get_device_identity_info()}")
 
     collector.start()
     time.sleep(15)  # Collect a few samples
     collector.stop()
 
-    print("\nRecent samples:")
-    for sample in collector.get_recent_samples(5):
+    print("\nRecent signed samples:")
+    for sample in collector.get_recent_samples(3):
         print(f"  {sample['timestamp']}: CFM={sample['fan']['cfm']}")
+        if '_signing' in sample:
+            print(f"    Hash: {sample['_signing']['payload_hash'][:32]}...")
+            print(f"    Sig:  {sample['_signing']['signature'][:40]}...")
