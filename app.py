@@ -36,6 +36,9 @@ from network import VerifierClient
 # Registration
 from registration import CommissioningManager, RegistrationClient, HardwareManifest
 
+# OTA Updates
+from ota import UpdateManager, ConfigManager
+
 # --- Flask Setup ---
 app = Flask(__name__, template_folder='templates')
 
@@ -119,6 +122,11 @@ registration_client = RegistrationClient(
     device_id=DEVICE_ID,
 )
 print(f"[REGISTER] Backend: {BACKEND_URL}")
+
+# --- OTA / Configuration ---
+update_manager = UpdateManager()
+config_manager = ConfigManager()
+print(f"[OTA] Update manager ready")
 
 
 # ============================================
@@ -579,6 +587,205 @@ def get_fan_table():
     return jsonify({
         "fan_model": "AC Infinity Cloudline S6",
         "table": table,
+    })
+
+
+# ============================================
+# ROUTES - OTA Updates
+# ============================================
+
+@app.route('/api/system/status', methods=['GET'])
+def system_status():
+    """Get overall system status including update info."""
+    return jsonify({
+        "device_id": DEVICE_ID,
+        "firmware_version": FIRMWARE_VERSION,
+        "simulation_mode": SIMULATION_MODE,
+        "update_status": update_manager.get_status(),
+        "config_status": config_manager.get_status(),
+    })
+
+
+@app.route('/api/system/update/check', methods=['GET'])
+def check_updates():
+    """Check for available firmware updates."""
+    available, manifest, message = update_manager.check_for_updates()
+    result = {
+        "update_available": available,
+        "message": message,
+        "current_version": FIRMWARE_VERSION,
+    }
+    if manifest:
+        result["available_version"] = manifest.version
+        result["changelog"] = manifest.changelog
+        result["release_date"] = manifest.release_date
+    return jsonify(result)
+
+
+@app.route('/api/system/update/download', methods=['POST'])
+def download_update():
+    """Download available firmware update."""
+    if update_manager.status.value not in ["available", "idle"]:
+        return jsonify({
+            "error": f"Cannot download in state: {update_manager.status.value}"
+        }), 400
+
+    # Check first
+    available, manifest, msg = update_manager.check_for_updates()
+    if not available:
+        return jsonify({"error": msg}), 400
+
+    success, message = update_manager.download_update(manifest)
+    return jsonify({
+        "success": success,
+        "message": message,
+        "status": update_manager.status.value,
+    })
+
+
+@app.route('/api/system/update/install', methods=['POST'])
+def install_update():
+    """Install downloaded firmware update."""
+    data = request.get_json() or {}
+    auto_backup = data.get("auto_backup", True)
+    auto_restart = data.get("auto_restart", False)
+
+    success, message = update_manager.install_update(
+        auto_backup=auto_backup,
+        auto_restart=auto_restart,
+    )
+
+    return jsonify({
+        "success": success,
+        "message": message,
+        "status": update_manager.status.value,
+    })
+
+
+@app.route('/api/system/update/perform', methods=['POST'])
+def perform_update():
+    """Perform full update: check, download, install."""
+    data = request.get_json() or {}
+    auto_backup = data.get("auto_backup", True)
+    auto_restart = data.get("auto_restart", False)
+
+    success, message = update_manager.perform_update(
+        auto_backup=auto_backup,
+        auto_restart=auto_restart,
+    )
+
+    return jsonify({
+        "success": success,
+        "message": message,
+        "status": update_manager.status.value,
+    })
+
+
+@app.route('/api/system/backups', methods=['GET'])
+def list_backups():
+    """List available firmware backups."""
+    backups = update_manager.list_backups()
+    return jsonify({
+        "count": len(backups),
+        "backups": backups,
+    })
+
+
+@app.route('/api/system/rollback', methods=['POST'])
+def rollback_firmware():
+    """Rollback to a previous firmware version."""
+    data = request.get_json() or {}
+    backup_path = data.get("backup_path")
+
+    success, message = update_manager.rollback(backup_path)
+    return jsonify({
+        "success": success,
+        "message": message,
+    })
+
+
+# ============================================
+# ROUTES - Remote Configuration
+# ============================================
+
+@app.route('/api/system/config', methods=['GET'])
+def get_config():
+    """Get current device configuration."""
+    return jsonify({
+        "config": config_manager.get_all(),
+        "status": config_manager.get_status(),
+    })
+
+
+@app.route('/api/system/config', methods=['POST'])
+def update_config():
+    """Update device configuration."""
+    data = request.get_json()
+    if not data:
+        return jsonify({"error": "No configuration data provided"}), 400
+
+    # Check for signature (for remote updates)
+    signature = data.pop("_signature", None)
+
+    if signature:
+        success, results = config_manager.apply_remote_config(data, signature)
+    else:
+        success, results = config_manager.set_multiple(data, source="api")
+
+    return jsonify({
+        "success": success,
+        "results": results,
+    })
+
+
+@app.route('/api/system/config/<key>', methods=['GET'])
+def get_config_value(key):
+    """Get a specific configuration value."""
+    value = config_manager.get(key)
+    if value is None and key not in config_manager.ALLOWED_FIELDS:
+        return jsonify({"error": f"Unknown configuration key: {key}"}), 404
+
+    return jsonify({
+        "key": key,
+        "value": value,
+    })
+
+
+@app.route('/api/system/config/<key>', methods=['PUT'])
+def set_config_value(key):
+    """Set a specific configuration value."""
+    data = request.get_json()
+    if data is None or "value" not in data:
+        return jsonify({"error": "Value required"}), 400
+
+    success, message = config_manager.set(key, data["value"], source="api")
+    return jsonify({
+        "success": success,
+        "message": message,
+        "key": key,
+        "value": config_manager.get(key),
+    })
+
+
+@app.route('/api/system/config/reset', methods=['POST'])
+def reset_config():
+    """Reset configuration to defaults."""
+    old_config = config_manager.reset_to_defaults()
+    return jsonify({
+        "status": "reset",
+        "previous_config": old_config,
+        "current_config": config_manager.get_all(),
+    })
+
+
+@app.route('/api/system/config/history', methods=['GET'])
+def config_history():
+    """Get configuration change history."""
+    limit = request.args.get('limit', 50, type=int)
+    history = config_manager.get_history(limit)
+    return jsonify({
+        "count": len(history),
+        "history": history,
     })
 
 

@@ -277,17 +277,26 @@ GET  /api/device/{id}/status   - Verification status
 
 ---
 
-## Phase 8: OTA Updates & Remote Management 📡
+## Phase 8: OTA Updates & Remote Management ✅
 
 **Goal:** Secure firmware updates and remote configuration.
 
 ### Software Tasks
 
-- [ ] Implement signed firmware updates
-- [ ] Create update verification (check signature before applying)
-- [ ] Add remote configuration endpoint
-- [ ] Implement rollback capability
-- [ ] Add `/api/system/update` endpoint
+- [x] Implement signed firmware updates
+- [x] Create update verification (check signature before applying)
+- [x] Add remote configuration endpoint
+- [x] Implement rollback capability
+- [x] Add `/api/system/update` endpoint
+
+### Implementation
+
+- `ota/update_manager.py` - Firmware update manager with signature verification
+- `ota/config_manager.py` - Remote configuration with validation
+- Ed25519 signature verification for manifests
+- Automatic backup before updates
+- Rollback to previous versions
+- 13 API endpoints: `/api/system/*`
 
 ---
 
@@ -303,7 +312,7 @@ GET  /api/device/{id}/status   - Verification status
 | 5 | Verifier Integration | ✅ Complete | Phase 4, Backend ready |
 | 6 | Registration & Site NFT | ✅ Complete | Phase 3, Smart contracts |
 | 7 | Anti-Tamper | ✅ Complete | Phase 2 |
-| 8 | OTA Updates | 🟡 Pending | Phase 3 |
+| 8 | OTA Updates | ✅ Complete | Phase 3 |
 
 ---
 
