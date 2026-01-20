@@ -86,6 +86,7 @@ class TelemetryCollector:
 
         # Callbacks for real-time data
         self._callbacks: List[Callable[[dict], None]] = []
+        self._epoch_callback: Optional[Callable[[dict], None]] = None
 
         # Current epoch tracking
         self._current_epoch_start: Optional[datetime] = None
@@ -342,6 +343,13 @@ class TelemetryCollector:
 
         self._store_epoch(epoch)
 
+        # Notify epoch callback
+        if self._epoch_callback:
+            try:
+                self._epoch_callback(epoch)
+            except Exception as e:
+                print(f"[WARN] Epoch callback error: {e}")
+
         # Reset for next epoch
         self._current_epoch_start = None
         self._current_epoch_samples = []
@@ -416,6 +424,10 @@ class TelemetryCollector:
         """Remove a callback function."""
         if callback in self._callbacks:
             self._callbacks.remove(callback)
+
+    def set_epoch_callback(self, callback: Callable[[dict], None]):
+        """Set callback function for completed epochs."""
+        self._epoch_callback = callback
 
     def get_recent_samples(self, limit: int = 100) -> List[dict]:
         """Get recent samples from the database."""

@@ -114,10 +114,13 @@ SIMULATION = {
 }
 
 # ============================================
-# NETWORK SETTINGS
+# NETWORK / VERIFIER SETTINGS
 # ============================================
 VERIFIER_URL = "http://localhost:8000"  # Backend verifier endpoint
+VERIFIER_API_KEY = None  # Optional API key for verifier auth
 API_TIMEOUT_SECONDS = 10
+SYNC_INTERVAL_SECONDS = 30  # How often to retry buffered data
+ENABLE_VERIFIER_SYNC = True  # Set False to disable verifier streaming
 
 # ============================================
 # GPIO PIN MAPPING

@@ -26,3 +26,9 @@ Thumbs.db
 # Environment variables
 .env
 .env.local
+
+# SQLite databases
+*.db
+
+# Keys (never commit private keys!)
+.beautifi/

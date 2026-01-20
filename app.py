@@ -18,11 +18,18 @@ from config import (
     FAN_PWM_PINS,
     PWM_FREQUENCY,
     SAMPLE_INTERVAL_SECONDS,
+    VERIFIER_URL,
+    VERIFIER_API_KEY,
+    SYNC_INTERVAL_SECONDS,
+    ENABLE_VERIFIER_SYNC,
 )
 
 # Telemetry
 from telemetry import TelemetryCollector
 from sensors import FanInterpolator
+
+# Network / Verifier
+from network import VerifierClient
 
 # --- Flask Setup ---
 app = Flask(__name__, template_folder='templates')
@@ -72,6 +79,33 @@ telemetry_collector = TelemetryCollector(
     db_path="telemetry.db",
     pwm_getter=get_average_pwm
 )
+
+# --- Verifier Client ---
+verifier_client = None
+if ENABLE_VERIFIER_SYNC:
+    verifier_client = VerifierClient(
+        verifier_url=VERIFIER_URL,
+        device_id=DEVICE_ID,
+        api_key=VERIFIER_API_KEY,
+        buffer_db_path="sync_buffer.db",
+        sync_interval_seconds=SYNC_INTERVAL_SECONDS,
+    )
+
+    # Wire up telemetry -> verifier streaming
+    def on_sample_collected(sample: dict):
+        """Send each sample to verifier as it's collected."""
+        if verifier_client:
+            verifier_client.send_sample(sample)
+
+    def on_epoch_complete(epoch: dict):
+        """Submit completed epochs to verifier."""
+        if verifier_client:
+            verifier_client.send_epoch(epoch)
+
+    telemetry_collector.add_callback(on_sample_collected)
+    telemetry_collector.set_epoch_callback(on_epoch_complete)
+
+    print(f"[VERIFIER] Streaming enabled to {VERIFIER_URL}")
 
 
 # ============================================
@@ -303,6 +337,54 @@ def verify_sample():
 
 
 # ============================================
+# ROUTES - Verifier Sync Status
+# ============================================
+
+@app.route('/api/sync/status', methods=['GET'])
+def sync_status():
+    """Get verifier sync status."""
+    if verifier_client is None:
+        return jsonify({
+            "enabled": False,
+            "message": "Verifier sync is disabled",
+        })
+
+    status = verifier_client.get_status()
+    return jsonify({
+        "enabled": True,
+        "verifier_url": VERIFIER_URL,
+        **status.to_dict(),
+    })
+
+
+@app.route('/api/sync/force', methods=['POST'])
+def force_sync():
+    """Force an immediate sync attempt."""
+    if verifier_client is None:
+        return jsonify({"error": "Verifier sync is disabled"}), 400
+
+    result = verifier_client.force_sync()
+    return jsonify({
+        "status": "sync attempted",
+        **result,
+    })
+
+
+@app.route('/api/sync/verifications', methods=['GET'])
+def get_verifications():
+    """Get recent verification responses from verifier."""
+    if verifier_client is None:
+        return jsonify({"error": "Verifier sync is disabled"}), 400
+
+    limit = request.args.get('limit', 10, type=int)
+    verifications = verifier_client.get_verifications(limit)
+    return jsonify({
+        "count": len(verifications),
+        "verifications": verifications,
+    })
+
+
+# ============================================
 # ROUTES - Sensors (Direct Access)
 # ============================================
 
@@ -321,8 +403,12 @@ def get_fan_table():
 # ============================================
 
 def cleanup():
-    """Clean up GPIO and stop telemetry on exit."""
+    """Clean up GPIO, stop telemetry, and stop verifier on exit."""
     print("\n[CLEAN] Cleaning up...")
+
+    # Stop verifier sync
+    if verifier_client:
+        verifier_client.stop()
 
     # Stop telemetry
     telemetry_collector.stop()
@@ -352,7 +438,12 @@ if __name__ == '__main__':
     print(f"  Firmware: {FIRMWARE_VERSION}")
     print(f"  Mode: {'SIMULATION' if SIMULATION_MODE else 'PRODUCTION'}")
     print(f"  Running on Pi: {RUNNING_ON_PI}")
+    print(f"  Verifier: {VERIFIER_URL if ENABLE_VERIFIER_SYNC else 'DISABLED'}")
     print("=" * 60)
+
+    # Start verifier background sync
+    if verifier_client:
+        verifier_client.start()
 
     # Auto-start telemetry collection
     telemetry_collector.start()
