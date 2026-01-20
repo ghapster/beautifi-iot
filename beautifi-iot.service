@@ -1,0 +1,18 @@
+[Unit]
+Description=BeautiFi IoT Flask Server
+After=network-online.target beautifi-wifi.service
+Wants=network-online.target
+
+[Service]
+Type=simple
+WorkingDirectory=/home/pi/beautifi-iot
+ExecStart=/usr/bin/python3 /home/pi/beautifi-iot/app.py
+User=pi
+Restart=always
+RestartSec=5
+StandardOutput=journal
+StandardError=journal
+Environment=PYTHONUNBUFFERED=1
+
+[Install]
+WantedBy=multi-user.target

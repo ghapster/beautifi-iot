@@ -294,23 +294,121 @@ def get_current_reading():
 # ROUTES - WiFi Configuration
 # ============================================
 
-@app.route('/api/iot/connect-wifi', methods=['POST'])
-def connect_wifi():
-    """Configure WiFi connection."""
-    ssid = request.form.get('ssid') or request.json.get('ssid')
-    password = request.form.get('password') or request.json.get('password')
+# WiFi provisioning instance (created on Pi only)
+wifi_provisioner = None
+if RUNNING_ON_PI:
+    try:
+        from wifi_provisioning import WiFiProvisioning
+        wifi_provisioner = WiFiProvisioning()
+        print("[WIFI] Provisioning module loaded")
+    except Exception as e:
+        print(f"[WIFI] Provisioning not available: {e}")
+
+
+@app.route('/api/wifi/status', methods=['GET'])
+def wifi_status():
+    """Get current WiFi status."""
+    if wifi_provisioner is None:
+        return jsonify({
+            "error": "WiFi provisioning not available (not on Pi)",
+            "simulation": True
+        })
+
+    return jsonify(wifi_provisioner.get_status())
+
+
+@app.route('/api/wifi/scan', methods=['GET'])
+def wifi_scan():
+    """Scan for available WiFi networks."""
+    if wifi_provisioner is None:
+        return jsonify({
+            "networks": [
+                {"ssid": "SimulatedNetwork", "signal": "80", "security": "WPA2"}
+            ],
+            "simulation": True
+        })
+
+    networks = wifi_provisioner.scan_networks()
+    return jsonify({
+        "count": len(networks),
+        "networks": networks
+    })
+
+
+@app.route('/api/wifi/connect', methods=['POST'])
+def wifi_connect():
+    """Connect to a WiFi network."""
+    data = request.get_json() or {}
+    ssid = data.get('ssid') or request.form.get('ssid')
+    password = data.get('password') or request.form.get('password')
 
     if not ssid or not password:
         return jsonify({'error': 'SSID and password required'}), 400
 
-    success = apply_wifi_settings(ssid, password)
+    if wifi_provisioner is None:
+        return jsonify({
+            'success': True,
+            'message': 'Simulated connection (not on Pi)',
+            'simulation': True
+        })
+
+    success, message = wifi_provisioner.connect_to_wifi(ssid, password)
+
+    return jsonify({
+        'success': success,
+        'message': message,
+        'status': wifi_provisioner.get_status()
+    })
+
+
+@app.route('/api/wifi/ap/start', methods=['POST'])
+def wifi_ap_start():
+    """Start Access Point (hotspot) mode."""
+    if wifi_provisioner is None:
+        return jsonify({'error': 'WiFi provisioning not available'}), 400
+
+    success, message = wifi_provisioner.start_ap_mode()
+    return jsonify({
+        'success': success,
+        'message': message,
+        'ap_ssid': wifi_provisioner.ap_ssid,
+        'ap_password': wifi_provisioner.ap_password
+    })
+
+
+@app.route('/api/wifi/ap/stop', methods=['POST'])
+def wifi_ap_stop():
+    """Stop Access Point mode."""
+    if wifi_provisioner is None:
+        return jsonify({'error': 'WiFi provisioning not available'}), 400
+
+    success, message = wifi_provisioner.stop_ap_mode()
+    return jsonify({
+        'success': success,
+        'message': message
+    })
+
+
+@app.route('/api/iot/connect-wifi', methods=['POST'])
+def connect_wifi():
+    """Configure WiFi connection (legacy endpoint)."""
+    ssid = request.form.get('ssid') or (request.json or {}).get('ssid')
+    password = request.form.get('password') or (request.json or {}).get('password')
+
+    if not ssid or not password:
+        return jsonify({'error': 'SSID and password required'}), 400
+
+    if wifi_provisioner:
+        success, message = wifi_provisioner.connect_to_wifi(ssid, password)
+    else:
+        from wifi_config import apply_wifi_settings
+        success = apply_wifi_settings(ssid, password)
+        message = "Connected" if success else "Failed"
 
     if success:
-        if RUNNING_ON_PI:
-            subprocess.run(["sudo", "reboot"])
-        return jsonify({'message': 'WiFi connected. Rebooting...'}), 200
+        return jsonify({'message': f'WiFi connected to {ssid}', 'success': True}), 200
     else:
-        return jsonify({'error': 'Failed to connect via nmcli'}), 500
+        return jsonify({'error': message, 'success': False}), 500
 
 
 # ============================================

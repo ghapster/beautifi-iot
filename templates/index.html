@@ -1,16 +1,339 @@
 <!DOCTYPE html>
 <html>
 <head>
-  <title>SalonSafe WiFi Setup</title>
+  <title>BeautiFi WiFi Setup</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <style>
+    * { box-sizing: border-box; }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      background: linear-gradient(135deg, #1a1a2e 0%, #16213e 100%);
+      color: #fff;
+      margin: 0;
+      padding: 20px;
+      min-height: 100vh;
+    }
+    .container {
+      max-width: 400px;
+      margin: 0 auto;
+    }
+    h1 {
+      text-align: center;
+      margin-bottom: 10px;
+      color: #00d4ff;
+    }
+    .subtitle {
+      text-align: center;
+      color: #888;
+      margin-bottom: 30px;
+    }
+    .card {
+      background: rgba(255,255,255,0.1);
+      border-radius: 12px;
+      padding: 20px;
+      margin-bottom: 20px;
+    }
+    .status {
+      display: flex;
+      justify-content: space-between;
+      padding: 10px 0;
+      border-bottom: 1px solid rgba(255,255,255,0.1);
+    }
+    .status:last-child { border-bottom: none; }
+    .status-label { color: #888; }
+    .status-value { font-weight: bold; }
+    .status-value.connected { color: #00ff88; }
+    .status-value.disconnected { color: #ff6b6b; }
+    .network-list {
+      max-height: 200px;
+      overflow-y: auto;
+      margin: 15px 0;
+    }
+    .network-item {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 12px;
+      background: rgba(255,255,255,0.05);
+      border-radius: 8px;
+      margin-bottom: 8px;
+      cursor: pointer;
+      transition: background 0.2s;
+    }
+    .network-item:hover {
+      background: rgba(255,255,255,0.15);
+    }
+    .network-item.selected {
+      background: rgba(0,212,255,0.2);
+      border: 1px solid #00d4ff;
+    }
+    .network-name { font-weight: bold; }
+    .network-signal {
+      font-size: 12px;
+      color: #888;
+    }
+    .signal-bars {
+      display: inline-flex;
+      gap: 2px;
+      margin-left: 10px;
+    }
+    .signal-bar {
+      width: 4px;
+      background: #444;
+      border-radius: 1px;
+    }
+    .signal-bar.active { background: #00ff88; }
+    input[type="password"], input[type="text"] {
+      width: 100%;
+      padding: 12px;
+      border: none;
+      border-radius: 8px;
+      background: rgba(255,255,255,0.1);
+      color: #fff;
+      font-size: 16px;
+      margin-bottom: 15px;
+    }
+    input::placeholder { color: #666; }
+    button {
+      width: 100%;
+      padding: 15px;
+      border: none;
+      border-radius: 8px;
+      background: #00d4ff;
+      color: #000;
+      font-size: 16px;
+      font-weight: bold;
+      cursor: pointer;
+      transition: background 0.2s;
+    }
+    button:hover { background: #00b8e6; }
+    button:disabled {
+      background: #444;
+      color: #888;
+      cursor: not-allowed;
+    }
+    button.secondary {
+      background: rgba(255,255,255,0.1);
+      color: #fff;
+      margin-top: 10px;
+    }
+    button.secondary:hover {
+      background: rgba(255,255,255,0.2);
+    }
+    .message {
+      padding: 12px;
+      border-radius: 8px;
+      margin-bottom: 15px;
+      text-align: center;
+    }
+    .message.success { background: rgba(0,255,136,0.2); color: #00ff88; }
+    .message.error { background: rgba(255,107,107,0.2); color: #ff6b6b; }
+    .message.info { background: rgba(0,212,255,0.2); color: #00d4ff; }
+    .spinner {
+      display: inline-block;
+      width: 20px;
+      height: 20px;
+      border: 2px solid rgba(255,255,255,0.3);
+      border-radius: 50%;
+      border-top-color: #00d4ff;
+      animation: spin 1s linear infinite;
+      margin-right: 10px;
+      vertical-align: middle;
+    }
+    @keyframes spin { to { transform: rotate(360deg); } }
+    .hidden { display: none; }
+  </style>
 </head>
 <body>
-  <h1>SalonSafe Device Setup</h1>
-  <form action="/api/iot/connect-wifi" method="POST">
-    <label>WiFi SSID:</label><br>
-    <input type="text" name="ssid" required><br><br>
-    <label>Password:</label><br>
-    <input type="password" name="password" required><br><br>
-    <button type="submit">Connect</button>
-  </form>
+  <div class="container">
+    <h1>BeautiFi Setup</h1>
+    <p class="subtitle">Connect your device to WiFi</p>
+
+    <!-- Status Card -->
+    <div class="card">
+      <div class="status">
+        <span class="status-label">Status</span>
+        <span class="status-value" id="conn-status">Checking...</span>
+      </div>
+      <div class="status">
+        <span class="status-label">Network</span>
+        <span class="status-value" id="current-ssid">-</span>
+      </div>
+      <div class="status">
+        <span class="status-label">IP Address</span>
+        <span class="status-value" id="ip-address">-</span>
+      </div>
+    </div>
+
+    <!-- Message Area -->
+    <div id="message" class="message hidden"></div>
+
+    <!-- WiFi Setup Card -->
+    <div class="card">
+      <h3>Available Networks</h3>
+      <div id="network-list" class="network-list">
+        <div style="text-align:center;color:#888;padding:20px;">
+          <span class="spinner"></span> Scanning...
+        </div>
+      </div>
+
+      <input type="text" id="ssid-input" placeholder="Network name (SSID)">
+      <input type="password" id="password-input" placeholder="Password">
+
+      <button id="connect-btn" onclick="connectWifi()">Connect</button>
+      <button class="secondary" onclick="scanNetworks()">Scan Again</button>
+    </div>
+
+    <!-- After Connected -->
+    <div id="next-steps" class="card hidden">
+      <h3>Next Steps</h3>
+      <p>Your device is now connected! You can:</p>
+      <button onclick="window.location.href='/dashboard'">Go to Dashboard</button>
+      <button class="secondary" onclick="window.location.href='/api/registration/status'">Check Registration</button>
+    </div>
+  </div>
+
+  <script>
+    let selectedNetwork = null;
+
+    // Check status on load
+    window.onload = function() {
+      checkStatus();
+      scanNetworks();
+    };
+
+    function showMessage(text, type) {
+      const msg = document.getElementById('message');
+      msg.textContent = text;
+      msg.className = 'message ' + type;
+      msg.classList.remove('hidden');
+    }
+
+    function hideMessage() {
+      document.getElementById('message').classList.add('hidden');
+    }
+
+    async function checkStatus() {
+      try {
+        const resp = await fetch('/api/wifi/status');
+        const data = await resp.json();
+
+        const statusEl = document.getElementById('conn-status');
+        const ssidEl = document.getElementById('current-ssid');
+        const ipEl = document.getElementById('ip-address');
+
+        if (data.connected) {
+          statusEl.textContent = 'Connected';
+          statusEl.className = 'status-value connected';
+          ssidEl.textContent = data.current_ssid || '-';
+          ipEl.textContent = data.ip_address || '-';
+          document.getElementById('next-steps').classList.remove('hidden');
+        } else if (data.ap_active) {
+          statusEl.textContent = 'AP Mode';
+          statusEl.className = 'status-value';
+          ssidEl.textContent = data.ap_ssid + ' (Hotspot)';
+          ipEl.textContent = '192.168.4.1';
+        } else {
+          statusEl.textContent = 'Disconnected';
+          statusEl.className = 'status-value disconnected';
+          ssidEl.textContent = '-';
+          ipEl.textContent = '-';
+        }
+      } catch (e) {
+        console.error('Status check failed:', e);
+      }
+    }
+
+    async function scanNetworks() {
+      const listEl = document.getElementById('network-list');
+      listEl.innerHTML = '<div style="text-align:center;color:#888;padding:20px;"><span class="spinner"></span> Scanning...</div>';
+
+      try {
+        const resp = await fetch('/api/wifi/scan');
+        const data = await resp.json();
+
+        if (data.networks && data.networks.length > 0) {
+          listEl.innerHTML = data.networks.map(net => {
+            const signal = parseInt(net.signal) || 0;
+            const bars = [
+              signal > 20 ? 'active' : '',
+              signal > 40 ? 'active' : '',
+              signal > 60 ? 'active' : '',
+              signal > 80 ? 'active' : ''
+            ];
+            return `
+              <div class="network-item" onclick="selectNetwork('${net.ssid}')">
+                <div>
+                  <div class="network-name">${net.ssid}</div>
+                  <div class="network-signal">${net.security || 'Open'}</div>
+                </div>
+                <div class="signal-bars">
+                  <div class="signal-bar ${bars[0]}" style="height:6px"></div>
+                  <div class="signal-bar ${bars[1]}" style="height:10px"></div>
+                  <div class="signal-bar ${bars[2]}" style="height:14px"></div>
+                  <div class="signal-bar ${bars[3]}" style="height:18px"></div>
+                </div>
+              </div>
+            `;
+          }).join('');
+        } else {
+          listEl.innerHTML = '<div style="text-align:center;color:#888;padding:20px;">No networks found</div>';
+        }
+      } catch (e) {
+        listEl.innerHTML = '<div style="text-align:center;color:#ff6b6b;padding:20px;">Scan failed</div>';
+      }
+    }
+
+    function selectNetwork(ssid) {
+      selectedNetwork = ssid;
+      document.getElementById('ssid-input').value = ssid;
+      document.getElementById('password-input').focus();
+
+      // Update selection UI
+      document.querySelectorAll('.network-item').forEach(el => {
+        el.classList.remove('selected');
+        if (el.querySelector('.network-name').textContent === ssid) {
+          el.classList.add('selected');
+        }
+      });
+    }
+
+    async function connectWifi() {
+      const ssid = document.getElementById('ssid-input').value;
+      const password = document.getElementById('password-input').value;
+
+      if (!ssid || !password) {
+        showMessage('Please enter network name and password', 'error');
+        return;
+      }
+
+      const btn = document.getElementById('connect-btn');
+      btn.disabled = true;
+      btn.innerHTML = '<span class="spinner"></span> Connecting...';
+      hideMessage();
+
+      try {
+        const resp = await fetch('/api/wifi/connect', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ ssid, password })
+        });
+
+        const data = await resp.json();
+
+        if (data.success) {
+          showMessage('Connected successfully!', 'success');
+          setTimeout(checkStatus, 2000);
+        } else {
+          showMessage(data.message || 'Connection failed', 'error');
+        }
+      } catch (e) {
+        showMessage('Connection error: ' + e.message, 'error');
+      } finally {
+        btn.disabled = false;
+        btn.textContent = 'Connect';
+      }
+    }
+  </script>
 </body>
 </html>

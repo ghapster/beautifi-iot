@@ -1,0 +1,17 @@
+[Unit]
+Description=BeautiFi WiFi Provisioning
+After=NetworkManager.service
+Before=beautifi-iot.service
+Wants=NetworkManager.service
+
+[Service]
+Type=oneshot
+RemainAfterExit=yes
+WorkingDirectory=/home/pi/beautifi-iot
+ExecStart=/usr/bin/python3 /home/pi/beautifi-iot/wifi_boot.py
+User=root
+StandardOutput=journal
+StandardError=journal
+
+[Install]
+WantedBy=multi-user.target
