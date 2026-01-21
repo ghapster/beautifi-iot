@@ -1,0 +1,9 @@
+#!/bin/bash
+
+# Start BeautiFi AP mode if no WiFi
+sleep 15
+if ! nmcli -t -f STATE general | grep -q "connected"; then
+    nmcli dev wifi hotspot ifname wlan0 ssid BeautiFi-Setup password beautifi123
+fi
+
+exit 0

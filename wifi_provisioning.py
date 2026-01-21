@@ -154,12 +154,20 @@ class WiFiProvisioning:
         return networks
 
     # ============================================
-    # AP (Hotspot) Mode
+    # AP (Hotspot) Mode - using hostapd
     # ============================================
+
+    def _run_shell(self, cmd: str, timeout: int = 30) -> Tuple[bool, str]:
+        """Run a shell command string."""
+        try:
+            result = subprocess.run(cmd, shell=True, capture_output=True, text=True, timeout=timeout)
+            return result.returncode == 0, (result.stdout + result.stderr).strip()
+        except Exception as e:
+            return False, str(e)
 
     def start_ap_mode(self) -> Tuple[bool, str]:
         """
-        Start the device in Access Point (hotspot) mode.
+        Start the device in Access Point (hotspot) mode using hostapd.
 
         Returns:
             Tuple of (success, message)
@@ -169,57 +177,49 @@ class WiFiProvisioning:
         # Stop any existing hotspot
         self.stop_ap_mode()
 
-        # Create hotspot using nmcli
-        success, output = self._run_command([
-            "nmcli", "dev", "wifi", "hotspot",
-            "ifname", self._interface,
-            "ssid", self.ap_ssid,
-            "password", self.ap_password
-        ])
+        # Tell NetworkManager to stop managing wlan0
+        self._run_shell("nmcli dev set wlan0 managed no")
+        time.sleep(1)
 
-        if success:
+        # Set up the interface with static IP
+        self._run_shell("ip addr flush dev wlan0")
+        self._run_shell(f"ip addr add {self.DEFAULT_AP_IP}/24 dev wlan0")
+        self._run_shell("ip link set wlan0 up")
+        time.sleep(1)
+
+        # Start hostapd and dnsmasq
+        success1, out1 = self._run_shell("systemctl start hostapd")
+        success2, out2 = self._run_shell("systemctl start dnsmasq")
+
+        if success1 and success2:
             self._ap_active = True
             print(f"[WIFI] AP mode started: {self.ap_ssid}")
             print(f"[WIFI] Connect to this network and go to http://{self.DEFAULT_AP_IP}:5000")
             return True, f"AP started: {self.ap_ssid}"
         else:
-            print(f"[WIFI] Failed to start AP: {output}")
-            return False, f"Failed to start AP: {output}"
+            print(f"[WIFI] Failed to start AP: {out1} {out2}")
+            return False, f"Failed to start AP: {out1} {out2}"
 
     def stop_ap_mode(self) -> Tuple[bool, str]:
-        """Stop AP mode if active."""
-        # Try to find and delete the hotspot connection
-        success, output = self._run_command([
-            "nmcli", "connection", "show"
-        ])
+        """Stop AP mode (hostapd) and return wlan0 to NetworkManager."""
+        print("[WIFI] Stopping AP mode...")
 
-        if success:
-            for line in output.split('\n'):
-                if 'Hotspot' in line or self.ap_ssid in line:
-                    # Extract connection name
-                    parts = line.split()
-                    if parts:
-                        conn_name = parts[0]
-                        self._run_command([
-                            "nmcli", "connection", "down", conn_name
-                        ])
-                        self._run_command([
-                            "nmcli", "connection", "delete", conn_name
-                        ])
+        # Stop hostapd and dnsmasq
+        self._run_shell("systemctl stop hostapd")
+        self._run_shell("systemctl stop dnsmasq")
+
+        # Clear interface and return to NetworkManager
+        self._run_shell("ip addr flush dev wlan0")
+        self._run_shell("nmcli dev set wlan0 managed yes")
+        time.sleep(2)
 
         self._ap_active = False
         return True, "AP stopped"
 
     def is_ap_active(self) -> bool:
-        """Check if AP mode is currently active."""
-        success, output = self._run_command([
-            "nmcli", "-t", "-f", "NAME,TYPE,DEVICE", "connection", "show", "--active"
-        ])
-        if success:
-            for line in output.split('\n'):
-                if ('Hotspot' in line or self.ap_ssid in line) and self._interface in line:
-                    return True
-        return False
+        """Check if AP mode (hostapd) is currently active."""
+        success, output = self._run_shell("systemctl is-active hostapd")
+        return success and "active" in output
 
     # ============================================
     # Client Mode (Connect to WiFi)
@@ -238,18 +238,21 @@ class WiFiProvisioning:
         """
         print(f"[WIFI] Connecting to: {ssid}")
 
-        # Stop AP mode if active
+        # Stop AP mode if active (hostapd)
         if self._ap_active or self.is_ap_active():
             print("[WIFI] Stopping AP mode...")
             self.stop_ap_mode()
-            time.sleep(2)
+            time.sleep(3)
+
+        # Make sure NetworkManager is managing wlan0
+        self._run_shell("nmcli dev set wlan0 managed yes")
+        time.sleep(2)
 
         # Try to connect
-        success, output = self._run_command([
-            "nmcli", "dev", "wifi", "connect", ssid,
-            "password", password,
-            "ifname", self._interface
-        ], timeout=60)
+        success, output = self._run_shell(
+            f'nmcli dev wifi connect "{ssid}" password "{password}" ifname {self._interface}',
+            timeout=60
+        )
 
         if success:
             # Wait for connection to establish
