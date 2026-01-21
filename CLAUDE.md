@@ -71,10 +71,83 @@ beautifi-iot/
 
 ## Hardware Configuration
 
-- **Fans:** AC Infinity Cloudline S6 (402 CFM max, 70W)
-- **GPIO Pins:** Fan 1=GPIO18, Fan 2=GPIO13, Fan 3=GPIO19
-- **PWM Frequency:** 100 Hz
-- **Sensors:** Simulated (SDP810, SGP30, INA219, BME280)
+### Power Architecture
+- **12V DC Adapter** → Powers fans + feeds DROK converter
+- **DROK Buck Converter** → Steps 12V → 5V → Powers Pi via USB
+- **Common ground** shared across all components
+
+### Signal Flow
+```
+Pi GPIO (3.3V PWM) → SN74 Logic Buffer → PWM-to-0-10V Converter → Fan VSP (yellow wire)
+```
+
+### Components
+| Component | Purpose |
+|-----------|---------|
+| Raspberry Pi 3B | PWM generation, control logic |
+| AC Infinity Cloudline S6 | Ventilation (402 CFM, 70W max) |
+| SN74 Logic Buffer | PWM signal conditioning & isolation |
+| PWM-to-0-10V Converter | Converts PWM → analog voltage for fan |
+| USB-C Breakout Boards | Access fan VSP (yellow wire) |
+| DROK 12V→5V Converter | Pi power from 12V rail |
+| Breadboard Rails | Power & ground distribution |
+
+### GPIO Pins
+- Fan 1: GPIO 18 (Pin 12)
+- Fan 2: GPIO 13 (Pin 33)
+- Fan 3: GPIO 19 (Pin 35)
+- PWM Frequency: 100 Hz
+
+### Fan Control Notes
+- AC Infinity fans use **0-10V analog** for speed control (not direct PWM)
+- Yellow wire = VSP (Variable Speed Potentiometer) input
+- PWM-to-0-10V modules convert Pi's PWM signal to analog
+
+### Detailed Wiring (3-Fan Setup)
+
+**FAN 1 (GPIO 18)**
+```
+Pi Pin 12 (GPIO18) → SN74 Pin 2 (input)
+SN74 Pin 7 (OE)    → Pi Pin 6 (GND)
+SN74 Pin 3 (out)   → PWM Module 1 → Fan 1 VSP (A8)
+```
+
+**FAN 2 (GPIO 13)**
+```
+Pi Pin 33 (GPIO13) → SN74 Pin 5 (input)
+SN74 Pin 4         → Pi Pin 14 (GND)
+SN74 Pin 6 (out)   → PWM Module 2 → Fan 2 VSP
+```
+
+**FAN 3 (GPIO 19)**
+```
+Pi Pin 35 (GPIO19) → SN74 Pin 9 (input)
+SN74 Pin 10        → Pi Pin 20 (GND)
+SN74 Pin 8 (out)   → PWM Module 3 → Fan 3 VSP
+```
+
+**Shared Power Rails**
+```
+12V Adapter VIN+ → Breadboard + Rail
+12V Adapter VIN− → Breadboard − Rail (common GND)
+DROK VCC         → + Rail
+DROK GND         → − Rail
+Pi powered via DROK 5V USB output
+```
+
+### Technical Learnings
+- AC Infinity fans require **analog 0-10V**, not direct PWM
+- PWM-to-0-10V modules solve this cleanly
+- SN74 buffers stabilize PWM and protect the Pi GPIO
+- PWM frequency should be ~1kHz (no benefit increasing beyond)
+- White tach wire (RPM feedback) is optional, unused currently
+- Current config.py has PWM_FREQUENCY=100Hz (may need adjustment to 1kHz)
+
+### Sensors (Currently Simulated)
+- Pressure: SDP810-500Pa
+- VOC: SGP30
+- Power: INA219
+- Temp/Humidity: BME280
 
 ## Backend Integration
 
