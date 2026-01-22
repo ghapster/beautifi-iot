@@ -1,5 +1,18 @@
 # config.py - BeautiFi IoT Configuration
 
+import os
+from pathlib import Path
+
+# Load .env file if present
+try:
+    from dotenv import load_dotenv
+    env_path = Path(__file__).parent / '.env'
+    if env_path.exists():
+        load_dotenv(env_path)
+        print(f"[CONFIG] Loaded .env from {env_path}")
+except ImportError:
+    pass  # dotenv not installed, use environment variables directly
+
 # ============================================
 # OPERATION MODE
 # ============================================
@@ -116,7 +129,7 @@ SIMULATION = {
 # ============================================
 # NETWORK / VERIFIER SETTINGS
 # ============================================
-VERIFIER_URL = "http://localhost:8000"  # Backend verifier endpoint
+VERIFIER_URL = "https://salon-safe-backend.onrender.com"  # Backend verifier endpoint
 VERIFIER_API_KEY = None  # Optional API key for verifier auth
 API_TIMEOUT_SECONDS = 10
 SYNC_INTERVAL_SECONDS = 30  # How often to retry buffered data
@@ -144,3 +157,18 @@ FAN_PWM_PINS = {
     "Fan 3": 19,
 }
 PWM_FREQUENCY = 100  # Hz
+
+# ============================================
+# EVIDENCE PACK / R2 STORAGE SETTINGS
+# ============================================
+# Cloudflare R2 S3-compatible storage for evidence packs
+R2_ENDPOINT_URL = os.getenv("R2_ENDPOINT_URL")
+R2_ACCESS_KEY_ID = os.getenv("R2_ACCESS_KEY_ID")
+R2_SECRET_ACCESS_KEY = os.getenv("R2_SECRET_ACCESS_KEY")
+R2_BUCKET_NAME = os.getenv("R2_BUCKET_NAME", "beautifi-evidence")
+
+# Evidence pack settings
+ENABLE_EVIDENCE_PACKS = True  # Set False to disable evidence pack creation
+EVIDENCE_AUTO_UPLOAD = True   # Automatically upload to R2 after building
+EVIDENCE_KEEP_LOCAL = False   # Keep local copy after upload (saves disk space if False)
+EVIDENCE_OUTPUT_DIR = "evidence_packs"  # Local directory for evidence packs

@@ -56,7 +56,7 @@
       statusDiv.textContent = `Sending ${speed}%...`;
 
       try {
-        const response = await fetch('http://192.168.0.150:5000/api/fan', {
+        const response = await fetch('/api/fan', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ speed })

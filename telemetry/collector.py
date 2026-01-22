@@ -19,8 +19,25 @@ from config import (
     TELEMETRY_BUFFER_SIZE,
     SIMULATION_MODE,
     DEVICE_ID,
+    R2_ENDPOINT_URL,
+    R2_ACCESS_KEY_ID,
+    R2_SECRET_ACCESS_KEY,
+    R2_BUCKET_NAME,
+    ENABLE_EVIDENCE_PACKS,
+    EVIDENCE_AUTO_UPLOAD,
+    EVIDENCE_KEEP_LOCAL,
+    EVIDENCE_OUTPUT_DIR,
 )
 from sensors import SimulatedSensors, FanInterpolator
+
+# Evidence pack imports (with graceful fallback)
+try:
+    from evidence import EvidencePackBuilder
+    EVIDENCE_AVAILABLE = True
+except ImportError as e:
+    print(f"[WARN] Evidence module not available: {e}")
+    EVIDENCE_AVAILABLE = False
+    EvidencePackBuilder = None
 
 # Crypto imports (with graceful fallback)
 try:
@@ -38,6 +55,16 @@ except ImportError as e:
     print(f"[WARN] Security module not available: {e}")
     SECURITY_AVAILABLE = False
     AnomalyDetector = None
+
+# Tokenomics imports (with graceful fallback)
+try:
+    from tokenomics import IssuanceCalculator, TokenomicsConfig
+    TOKENOMICS_AVAILABLE = True
+except ImportError as e:
+    print(f"[WARN] Tokenomics module not available: {e}")
+    TOKENOMICS_AVAILABLE = False
+    IssuanceCalculator = None
+    TokenomicsConfig = None
 
 
 class TelemetryCollector:
@@ -58,6 +85,7 @@ class TelemetryCollector:
         pwm_getter: Optional[Callable[[], float]] = None,
         enable_signing: bool = True,
         enable_anomaly_detection: bool = True,
+        enable_evidence_packs: bool = True,
     ):
         """
         Initialize the telemetry collector.
@@ -96,6 +124,34 @@ class TelemetryCollector:
             except Exception as e:
                 print(f"[WARN] Failed to initialize anomaly detector: {e}")
                 self.enable_anomaly_detection = False
+
+        # Initialize evidence pack builder if enabled
+        self.enable_evidence_packs = enable_evidence_packs and EVIDENCE_AVAILABLE and ENABLE_EVIDENCE_PACKS
+        self._evidence_builder = None
+        if self.enable_evidence_packs:
+            try:
+                self._evidence_builder = EvidencePackBuilder(
+                    output_dir=EVIDENCE_OUTPUT_DIR,
+                    r2_endpoint_url=R2_ENDPOINT_URL,
+                    r2_access_key_id=R2_ACCESS_KEY_ID,
+                    r2_secret_access_key=R2_SECRET_ACCESS_KEY,
+                    r2_bucket_name=R2_BUCKET_NAME,
+                    auto_upload=EVIDENCE_AUTO_UPLOAD,
+                    keep_local=EVIDENCE_KEEP_LOCAL,
+                )
+                print(f"[EVIDENCE] Pack builder initialized, upload={'enabled' if EVIDENCE_AUTO_UPLOAD else 'disabled'}")
+            except Exception as e:
+                print(f"[WARN] Failed to initialize evidence pack builder: {e}")
+                self.enable_evidence_packs = False
+
+        # Initialize tokenomics issuance calculator
+        self._issuance_calculator = None
+        if TOKENOMICS_AVAILABLE:
+            try:
+                self._issuance_calculator = IssuanceCalculator()
+                print(f"[TOKENOMICS] Issuance calculator initialized (base rate: {self._issuance_calculator.config.base_issuance_rate})")
+            except Exception as e:
+                print(f"[WARN] Failed to initialize issuance calculator: {e}")
 
         # Initialize sensors (simulation or real based on config)
         self.fan_interpolator = FanInterpolator()
@@ -338,8 +394,9 @@ class TelemetryCollector:
         eligible_minutes = len(eligible_samples) * (SAMPLE_INTERVAL_SECONDS / 60)
 
         # Build epoch data
+        epoch_id = f"ep-{start_time.strftime('%Y%m%d%H')}-{DEVICE_ID}"
         epoch_data = {
-            "epoch_id": f"ep-{start_time.strftime('%Y%m%d%H')}-{DEVICE_ID}",
+            "epoch_id": epoch_id,
             "device_id": DEVICE_ID,
             "start_time": start_time.isoformat() + "Z",
             "end_time": end_time.isoformat() + "Z",
@@ -353,6 +410,27 @@ class TelemetryCollector:
                 "total_energy_wh": round(total_energy, 2),
             },
         }
+
+        # Calculate token issuance if tokenomics available
+        issuance_result = None
+        if self._issuance_calculator:
+            try:
+                issuance_result = self._issuance_calculator.calculate_epoch_issuance(
+                    epoch_id=epoch_id,
+                    device_id=DEVICE_ID,
+                    samples=samples,
+                )
+                epoch_data["issuance"] = issuance_result.to_dict()["issuance"]
+                epoch_data["issuance"]["split"] = issuance_result.split.to_dict()
+                epoch_data["issuance"]["validation"] = {
+                    "total_events": issuance_result.total_events,
+                    "valid_events": issuance_result.valid_events,
+                    "quality_factor": round(issuance_result.quality_factor, 3),
+                }
+                print(f"[TOKENOMICS] Epoch {epoch_id}: {issuance_result.tokens_issued:.4f} BTFI "
+                      f"(EI={issuance_result.ei_clamped:.2f}, QF={issuance_result.quality_factor:.2f})")
+            except Exception as e:
+                print(f"[WARN] Issuance calculation failed: {e}")
 
         # Sign the epoch if enabled
         if self.enable_signing and self._identity is not None:
@@ -368,6 +446,21 @@ class TelemetryCollector:
             epoch = {**epoch_data, "sample_count": len(samples)}
 
         self._store_epoch(epoch)
+
+        # Build evidence pack if enabled
+        if self.enable_evidence_packs and self._evidence_builder:
+            try:
+                device_identity = self.get_device_identity_info()
+                evidence_pack = self._evidence_builder.build_pack(
+                    epoch=epoch,
+                    samples=samples,
+                    device_identity=device_identity,
+                )
+                print(f"[EVIDENCE] Pack SHA256: {evidence_pack.zip_sha256}")
+                if evidence_pack.uploaded:
+                    print(f"[EVIDENCE] Uploaded to: {evidence_pack.storage_key}")
+            except Exception as e:
+                print(f"[WARN] Evidence pack error: {e}")
 
         # Notify epoch callback
         if self._epoch_callback:

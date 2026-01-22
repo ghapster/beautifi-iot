@@ -1,0 +1,19 @@
+# BeautiFi IoT Dependencies
+
+# Web framework
+flask>=2.0.0
+
+# HTTP requests
+requests>=2.25.0
+
+# Cryptography (Ed25519 signing)
+cryptography>=3.4.0
+
+# Environment variables
+python-dotenv>=0.19.0
+
+# S3-compatible storage (Cloudflare R2)
+boto3>=1.26.0
+
+# GPIO (Raspberry Pi only - install separately on Pi)
+# RPi.GPIO>=0.7.0

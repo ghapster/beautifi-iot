@@ -178,18 +178,18 @@ class WiFiProvisioning:
         self.stop_ap_mode()
 
         # Tell NetworkManager to stop managing wlan0
-        self._run_shell("nmcli dev set wlan0 managed no")
+        self._run_shell("sudo nmcli dev set wlan0 managed no")
         time.sleep(1)
 
         # Set up the interface with static IP
-        self._run_shell("ip addr flush dev wlan0")
-        self._run_shell(f"ip addr add {self.DEFAULT_AP_IP}/24 dev wlan0")
-        self._run_shell("ip link set wlan0 up")
+        self._run_shell("sudo ip addr flush dev wlan0")
+        self._run_shell(f"sudo ip addr add {self.DEFAULT_AP_IP}/24 dev wlan0")
+        self._run_shell("sudo ip link set wlan0 up")
         time.sleep(1)
 
         # Start hostapd and dnsmasq
-        success1, out1 = self._run_shell("systemctl start hostapd")
-        success2, out2 = self._run_shell("systemctl start dnsmasq")
+        success1, out1 = self._run_shell("sudo systemctl start hostapd")
+        success2, out2 = self._run_shell("sudo systemctl start dnsmasq")
 
         if success1 and success2:
             self._ap_active = True
@@ -205,12 +205,12 @@ class WiFiProvisioning:
         print("[WIFI] Stopping AP mode...")
 
         # Stop hostapd and dnsmasq
-        self._run_shell("systemctl stop hostapd")
-        self._run_shell("systemctl stop dnsmasq")
+        self._run_shell("sudo systemctl stop hostapd")
+        self._run_shell("sudo systemctl stop dnsmasq")
 
         # Clear interface and return to NetworkManager
-        self._run_shell("ip addr flush dev wlan0")
-        self._run_shell("nmcli dev set wlan0 managed yes")
+        self._run_shell("sudo ip addr flush dev wlan0")
+        self._run_shell("sudo nmcli dev set wlan0 managed yes")
         time.sleep(2)
 
         self._ap_active = False
@@ -218,7 +218,7 @@ class WiFiProvisioning:
 
     def is_ap_active(self) -> bool:
         """Check if AP mode (hostapd) is currently active."""
-        success, output = self._run_shell("systemctl is-active hostapd")
+        success, output = self._run_shell("sudo systemctl is-active hostapd")
         return success and "active" in output
 
     # ============================================
@@ -245,12 +245,12 @@ class WiFiProvisioning:
             time.sleep(3)
 
         # Make sure NetworkManager is managing wlan0
-        self._run_shell("nmcli dev set wlan0 managed yes")
+        self._run_shell("sudo nmcli dev set wlan0 managed yes")
         time.sleep(2)
 
         # Try to connect
         success, output = self._run_shell(
-            f'nmcli dev wifi connect "{ssid}" password "{password}" ifname {self._interface}',
+            f'sudo nmcli dev wifi connect "{ssid}" password "{password}" ifname {self._interface}',
             timeout=60
         )
 
