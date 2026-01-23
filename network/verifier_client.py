@@ -375,6 +375,10 @@ class VerifierClient:
             self._record_error("Request timeout")
             return None
         except Exception as e:
+            # Reset session on retry errors to clear cached error state
+            if "too many" in str(e).lower() or "max retries" in str(e).lower():
+                print("[VERIFIER] Resetting HTTP session due to retry exhaustion")
+                self._session = self._create_session()
             self._record_error(f"Request error: {e}")
             return None
 
