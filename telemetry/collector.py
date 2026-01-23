@@ -27,6 +27,8 @@ from config import (
     EVIDENCE_AUTO_UPLOAD,
     EVIDENCE_KEEP_LOCAL,
     EVIDENCE_OUTPUT_DIR,
+    VERIFIER_URL,
+    ENABLE_VERIFIER_SYNC,
 )
 from sensors import SimulatedSensors, FanInterpolator
 
@@ -65,6 +67,15 @@ except ImportError as e:
     TOKENOMICS_AVAILABLE = False
     IssuanceCalculator = None
     TokenomicsConfig = None
+
+# Verifier client imports (with graceful fallback)
+try:
+    from network import VerifierClient
+    VERIFIER_AVAILABLE = True
+except ImportError as e:
+    print(f"[WARN] Verifier client not available: {e}")
+    VERIFIER_AVAILABLE = False
+    VerifierClient = None
 
 
 class TelemetryCollector:
@@ -152,6 +163,20 @@ class TelemetryCollector:
                 print(f"[TOKENOMICS] Issuance calculator initialized (base rate: {self._issuance_calculator.config.base_issuance_rate})")
             except Exception as e:
                 print(f"[WARN] Failed to initialize issuance calculator: {e}")
+
+        # Initialize verifier client for backend submission
+        self._verifier_client = None
+        if VERIFIER_AVAILABLE and ENABLE_VERIFIER_SYNC:
+            try:
+                self._verifier_client = VerifierClient(
+                    verifier_url=VERIFIER_URL,
+                    device_id=DEVICE_ID,
+                    auto_sync=True,
+                )
+                self._verifier_client.start()
+                print(f"[VERIFIER] Client initialized: {VERIFIER_URL}")
+            except Exception as e:
+                print(f"[WARN] Failed to initialize verifier client: {e}")
 
         # Initialize sensors (simulation or real based on config)
         self.fan_interpolator = FanInterpolator()
@@ -523,9 +548,13 @@ class TelemetryCollector:
                 epoch = sign_epoch(epoch_data, samples, self._identity)
                 print(f"[EPOCH] Signed epoch: {epoch['epoch_id']}")
                 print(f"        Merkle root: {epoch['merkle_root'][:32]}...")
-                print(f"        Samples: {epoch['sample_count']}, TAR: {epoch['summary']['total_tar_cfm_min']}")
+                # v1 spec: TAR is in summary.mitigation.total_tar_cfm_min
+                tar_value = epoch['summary'].get('mitigation', {}).get('total_tar_cfm_min', total_tar)
+                print(f"        Samples: {epoch['sample_count']}, TAR: {tar_value}")
             except Exception as e:
                 print(f"[WARN] Failed to sign epoch: {e}")
+                import traceback
+                traceback.print_exc()
                 epoch = {**epoch_data, "sample_count": len(samples)}
         else:
             epoch = {**epoch_data, "sample_count": len(samples)}
@@ -546,6 +575,18 @@ class TelemetryCollector:
                     print(f"[EVIDENCE] Uploaded to: {evidence_pack.storage_key}")
             except Exception as e:
                 print(f"[WARN] Evidence pack error: {e}")
+
+        # Submit epoch to backend verifier
+        if self._verifier_client:
+            try:
+                response = self._verifier_client.send_epoch(epoch)
+                if response:
+                    print(f"[VERIFIER] Epoch submitted: {epoch['epoch_id']}")
+                    print(f"[VERIFIER] Response: {response.get('status', 'unknown')}")
+                else:
+                    print(f"[VERIFIER] Epoch buffered for later sync: {epoch['epoch_id']}")
+            except Exception as e:
+                print(f"[WARN] Verifier submission error: {e}")
 
         # Notify epoch callback
         if self._epoch_callback:
@@ -636,6 +677,10 @@ class TelemetryCollector:
         # Save anomaly baselines
         if self._anomaly_detector:
             self._anomaly_detector.save_baselines()
+
+        # Stop verifier client
+        if self._verifier_client:
+            self._verifier_client.stop()
 
         print("[STOP] Telemetry collector stopped")
 
