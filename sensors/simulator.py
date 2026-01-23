@@ -130,6 +130,25 @@ class SimulatedSensors:
         dp = self._add_noise(dp, 2)
         return round(max(0, dp), 1)
 
+    def _simulate_pm25(self, fan_cfm: float) -> float:
+        """
+        Simulate PM2.5 particulate matter readings.
+        Indoor baseline ~10-15 μg/m³, increases with activity, decreases with ventilation.
+        """
+        baseline = 12.0  # μg/m³ typical indoor
+
+        # PM2.5 increases slightly with VOC spikes (activity correlation)
+        if self._in_spike:
+            baseline += 5.0
+
+        # Ventilation reduces PM2.5
+        if fan_cfm > 0:
+            reduction = (fan_cfm / FAN_SPECS["max_cfm"]) * 4.0
+            baseline -= reduction
+
+        pm25 = self._add_noise(baseline, 2.0)
+        return round(max(0, pm25), 1)
+
     def read_all(self, current_pwm: float) -> dict:
         """
         Get all simulated sensor readings.
@@ -150,6 +169,7 @@ class SimulatedSensors:
         humidity = self._simulate_humidity()
         co2 = self._simulate_co2(cfm)
         delta_p = self._simulate_pressure(cfm)
+        pm25 = self._simulate_pm25(cfm)
 
         # Calculate VOC reduction (compared to no-ventilation baseline)
         voc_reduction_pct = 0
@@ -163,21 +183,29 @@ class SimulatedSensors:
             "simulation_mode": True,
 
             # Fan metrics (interpolated from known specs)
+            # Note: Using both legacy names and v1 spec names for compatibility
             "fan": {
                 "pwm_percent": current_pwm,
                 "cfm": cfm,
                 "rpm": fan_metrics["rpm"],
                 "watts": fan_metrics["watts"],
+                "power_w": fan_metrics["watts"],  # v1 spec name
                 "efficiency_cfm_w": fan_metrics["efficiency_cfm_w"],
             },
 
             # Environmental readings (simulated)
+            # Note: Using both legacy names and v1 spec names for compatibility
             "environment": {
                 "voc_ppb": voc,
+                "tvoc_ppb": voc,  # v1 spec name
                 "co2_ppm": co2,
+                "eco2_ppm": co2,  # v1 spec name
+                "pm25_ugm3": pm25,  # v1 spec
                 "temperature_c": temp,
+                "temp_c": temp,  # v1 spec name
                 "humidity_pct": humidity,
                 "delta_p_pa": delta_p,
+                "dp_pa": delta_p,  # v1 spec name
             },
 
             # Derived metrics

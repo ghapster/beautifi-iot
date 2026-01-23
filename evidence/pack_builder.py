@@ -117,6 +117,60 @@ class EvidencePackBuilder:
         elif not BOTO3_AVAILABLE:
             print("[EVIDENCE] boto3 not available, upload disabled")
 
+    def _format_sample_for_spec(self, sample: dict, seq: int) -> dict:
+        """Format a sample according to Evidence Pack v1 spec."""
+        env = sample.get("environment", {})
+        fan = sample.get("fan", {})
+        derived = sample.get("derived", {})
+
+        return {
+            "seq": seq,
+            "timestamp": sample.get("timestamp", ""),
+            "environment": {
+                "tvoc_ppb": env.get("tvoc_ppb", env.get("voc_ppb", 0)),
+                "eco2_ppm": env.get("eco2_ppm", env.get("co2_ppm", 0)),
+                "pm25_ugm3": env.get("pm25_ugm3", 0),
+                "temp_c": env.get("temp_c", env.get("temperature_c", 0)),
+                "humidity_pct": env.get("humidity_pct", 0),
+                "dp_pa": env.get("dp_pa", env.get("delta_p_pa", 0)),
+            },
+            "fan": {
+                "rpm": fan.get("rpm", 0),
+                "power_w": fan.get("power_w", fan.get("watts", 0)),
+                "cfm": fan.get("cfm", 0),
+                "efficiency_cfm_w": fan.get("efficiency_cfm_w", 0),
+            },
+            "derived": {
+                "tar_cfm_min": derived.get("tar_cfm_min", 0),
+                "energy_wh": derived.get("energy_wh", 0),
+            },
+            "anomaly_flags": sample.get("_anomalies", {}).get("types", []),
+        }
+
+    def _format_device_identity_for_spec(self, device_identity: dict, epoch: dict) -> dict:
+        """Format device identity according to Evidence Pack v1 spec."""
+        device_id = epoch.get("device_id", device_identity.get("device_id", "unknown"))
+
+        return {
+            "schema_version": "1.0",
+            "device_id": device_id,
+            "hardware": {
+                "model": device_identity.get("hardware", {}).get("model", "BeautiFi-Pro-v1"),
+                "serial": device_identity.get("hardware", {}).get("serial", ""),
+                "firmware_version": device_identity.get("firmware_version", "1.0.0"),
+            },
+            "cryptography": {
+                "algorithm": "ed25519",
+                "public_key": device_identity.get("public_key", ""),
+                "key_created_at": device_identity.get("key_created_at", ""),
+            },
+            "registration": {
+                "registered_at": device_identity.get("registered_at", ""),
+                "salon_id": device_identity.get("salon_id", ""),
+                "wallet_address": device_identity.get("wallet_address", ""),
+            },
+        }
+
     def build_pack(
         self,
         epoch: dict,
@@ -124,7 +178,7 @@ class EvidencePackBuilder:
         device_identity: Optional[dict] = None,
     ) -> EvidencePack:
         """
-        Build an evidence pack for an epoch.
+        Build an evidence pack for an epoch according to Evidence Pack v1 spec.
 
         Args:
             epoch: Signed epoch data with merkle_root
@@ -140,15 +194,67 @@ class EvidencePackBuilder:
 
         print(f"[EVIDENCE] Building pack for epoch: {epoch_id}")
 
-        # Create pack metadata
+        # Format samples according to v1 spec
+        formatted_samples = [
+            self._format_sample_for_spec(s, i) for i, s in enumerate(samples)
+        ]
+
+        # Build samples.json with wrapper
+        samples_doc = {
+            "schema_version": "1.0",
+            "epoch_id": epoch_id,
+            "sample_interval_seconds": 12,  # From config
+            "samples": formatted_samples,
+        }
+
+        # Build metadata.json with MRV model settings
         metadata = {
+            "schema_version": "1.0",
             "pack_version": "1.0",
+            "created_at": timestamp,
             "epoch_id": epoch_id,
             "device_id": device_id,
-            "sample_count": len(samples),
-            "created_at": timestamp,
-            "merkle_root": epoch.get("merkle_root"),
-            "epoch_signature": epoch.get("_signing", {}).get("signature"),
+            "content": {
+                "sample_count": len(samples),
+                "merkle_root": epoch.get("merkle_root", ""),
+                "epoch_body_hash": epoch.get("_signing", {}).get("epoch_body_hash", epoch.get("_signing", {}).get("epoch_hash", "")),
+                "epoch_signature": epoch.get("_signing", {}).get("signature", ""),
+            },
+            "mrv_model": {
+                "model_id": "duan-v1",
+                "model_version": "1.0.0",
+                "settings": {
+                    "epoch_length_min": 60,
+                    "sample_interval_sec": 12,
+                    "events_per_epoch": 5,
+                    "minutes_per_event": 12,
+                    "baseline_eff_cfm_per_w": 9.0,
+                    "ei_min": 0.8,
+                    "ei_max": 1.2,
+                    "gamma_quality": 1.0,
+                    "base_issuance_rate": 0.001,
+                    "bca_scalar": 1.0,
+                    "min_cfm_threshold": 50,
+                    "min_valid_samples_pct": 80,
+                },
+            },
+            "storage": {
+                "provider": "cloudflare-r2",
+                "bucket": self.r2_bucket_name or "beautifi-evidence",
+                "path": "",  # Will be set after upload
+                "pack_hash": "",  # Will be set after ZIP creation
+            },
+        }
+
+        # Build leaf_hashes.json
+        leaf_hashes_list = epoch.get("leaf_hashes", [])
+        leaf_hashes_doc = {
+            "schema_version": "1.0",
+            "epoch_id": epoch_id,
+            "hash_algorithm": "sha256",
+            "leaf_count": len(leaf_hashes_list),
+            "leaves": leaf_hashes_list,
+            "merkle_root": epoch.get("merkle_root", ""),
         }
 
         # Build ZIP file
@@ -156,37 +262,38 @@ class EvidencePackBuilder:
         zip_path = self.output_dir / zip_filename
 
         with zipfile.ZipFile(zip_path, 'w', zipfile.ZIP_DEFLATED) as zf:
-            # Add epoch summary
+            # Add epoch summary (keep original structure with schema_version)
+            epoch_with_version = {"schema_version": "1.0", **epoch}
             zf.writestr(
                 "epoch.json",
-                json.dumps(epoch, indent=2, sort_keys=True)
+                json.dumps(epoch_with_version, indent=2, sort_keys=True)
             )
 
-            # Add all samples
+            # Add formatted samples
             zf.writestr(
                 "samples.json",
-                json.dumps(samples, indent=2, sort_keys=True)
+                json.dumps(samples_doc, indent=2, sort_keys=True)
             )
 
             # Add device identity if provided
             if device_identity:
+                identity_doc = self._format_device_identity_for_spec(device_identity, epoch)
                 zf.writestr(
                     "device_identity.json",
-                    json.dumps(device_identity, indent=2, sort_keys=True)
+                    json.dumps(identity_doc, indent=2, sort_keys=True)
                 )
 
-            # Add metadata
+            # Add leaf hashes
+            zf.writestr(
+                "leaf_hashes.json",
+                json.dumps(leaf_hashes_doc, indent=2, sort_keys=True)
+            )
+
+            # Add metadata (will update pack_hash after)
             zf.writestr(
                 "metadata.json",
                 json.dumps(metadata, indent=2, sort_keys=True)
             )
-
-            # Add leaf hashes if present (for merkle proof verification)
-            if "leaf_hashes" in epoch:
-                zf.writestr(
-                    "leaf_hashes.json",
-                    json.dumps(epoch["leaf_hashes"], indent=2)
-                )
 
         # Calculate SHA256 of the ZIP
         zip_sha256 = self._hash_file(zip_path)
@@ -232,9 +339,9 @@ class EvidencePackBuilder:
             print("[EVIDENCE] Upload skipped: R2 not configured")
             return False
 
-        # Storage key: device_id/year/month/epoch_id.zip
+        # Storage key per v1 spec: epochs/{device_id}/{year}/{month}/{day}/{epoch_id}.zip
         created = datetime.fromisoformat(pack.created_at.replace("Z", "+00:00"))
-        storage_key = f"{pack.device_id}/{created.year}/{created.month:02d}/{pack.epoch_id}.zip"
+        storage_key = f"epochs/{pack.device_id}/{created.year}/{created.month:02d}/{created.day:02d}/{pack.epoch_id}.zip"
 
         try:
             # Upload with metadata
@@ -264,9 +371,9 @@ class EvidencePackBuilder:
             print(f"[EVIDENCE] Upload failed: {e}")
             return False
 
-    def get_pack_url(self, epoch_id: str, device_id: str, year: int, month: int) -> str:
-        """Generate the storage URL for a pack."""
-        storage_key = f"{device_id}/{year}/{month:02d}/{epoch_id}.zip"
+    def get_pack_url(self, epoch_id: str, device_id: str, year: int, month: int, day: int = 1) -> str:
+        """Generate the storage URL for a pack per v1 spec."""
+        storage_key = f"epochs/{device_id}/{year}/{month:02d}/{day:02d}/{epoch_id}.zip"
         return f"{self.r2_endpoint_url}/{self.r2_bucket_name}/{storage_key}"
 
     def download_pack(self, storage_key: str, output_path: str) -> Optional[str]:

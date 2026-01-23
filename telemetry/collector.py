@@ -328,6 +328,27 @@ class TelemetryCollector:
             epoch_hash = epoch['_signing'].get('epoch_hash')
             signature = epoch['_signing'].get('signature')
 
+        # Handle both v1 spec format and legacy format
+        summary = epoch.get("summary", {})
+        if "mitigation" in summary:
+            # v1 spec format
+            total_tar = summary["mitigation"]["total_tar_cfm_min"]
+            total_energy = summary["mitigation"]["total_energy_wh"]
+            avg_cfm = summary["fan_performance"]["avg_cfm"]
+            avg_watts = summary["fan_performance"]["avg_power_w"]
+            avg_voc = summary["air_quality"]["avg_tvoc_ppb"]
+        else:
+            # Legacy format
+            total_tar = summary.get("total_tar_cfm_min", 0)
+            total_energy = summary.get("total_energy_wh", 0)
+            avg_cfm = summary.get("avg_cfm", 0)
+            avg_watts = summary.get("avg_watts", 0)
+            avg_voc = summary.get("avg_voc_ppb", 0)
+
+        # Handle v1 time format vs legacy
+        start_time = epoch.get("start_time") or epoch.get("time", {}).get("start", "")
+        end_time = epoch.get("end_time") or epoch.get("time", {}).get("end", "")
+
         cursor.execute("""
             INSERT OR REPLACE INTO epochs (
                 epoch_id, device_id, start_time, end_time, sample_count,
@@ -337,14 +358,14 @@ class TelemetryCollector:
         """, (
             epoch["epoch_id"],
             epoch["device_id"],
-            epoch["start_time"],
-            epoch["end_time"],
-            epoch["sample_count"],
-            epoch["summary"]["total_tar_cfm_min"],
-            epoch["summary"]["avg_cfm"],
-            epoch["summary"]["avg_watts"],
-            epoch["summary"]["avg_voc_ppb"],
-            epoch["summary"]["total_energy_wh"],
+            start_time,
+            end_time,
+            epoch.get("sample_count", 0),
+            total_tar,
+            avg_cfm,
+            avg_watts,
+            avg_voc,
+            total_energy,
             merkle_root,
             epoch_hash,
             signature,
@@ -381,34 +402,88 @@ class TelemetryCollector:
             samples[-1]["timestamp"].replace("Z", "+00:00")
         )
 
-        # Calculate epoch summary
+        # Calculate duration in minutes
+        duration_minutes = (end_time - start_time).total_seconds() / 60
+
+        # Air quality aggregations
+        voc_values = [s["environment"].get("voc_ppb", s["environment"].get("tvoc_ppb", 0)) for s in samples]
+        co2_values = [s["environment"].get("co2_ppm", s["environment"].get("eco2_ppm", 0)) for s in samples]
+        pm25_values = [s["environment"].get("pm25_ugm3", 0) for s in samples]
+        temp_values = [s["environment"].get("temperature_c", s["environment"].get("temp_c", 0)) for s in samples]
+        humidity_values = [s["environment"].get("humidity_pct", 0) for s in samples]
+        pressure_values = [s["environment"].get("delta_p_pa", s["environment"].get("dp_pa", 0)) for s in samples]
+
+        avg_tvoc = sum(voc_values) / len(voc_values) if voc_values else 0
+        max_tvoc = max(voc_values) if voc_values else 0
+        avg_eco2 = sum(co2_values) / len(co2_values) if co2_values else 0
+        avg_pm25 = sum(pm25_values) / len(pm25_values) if pm25_values else 0
+        avg_temp = sum(temp_values) / len(temp_values) if temp_values else 0
+        avg_humidity = sum(humidity_values) / len(humidity_values) if humidity_values else 0
+        avg_pressure = sum(pressure_values) / len(pressure_values) if pressure_values else 0
+
+        # Fan performance aggregations
+        cfm_values = [s["fan"]["cfm"] for s in samples]
+        rpm_values = [s["fan"].get("rpm", 0) for s in samples]
+        watts_values = [s["fan"].get("watts", s["fan"].get("power_w", 0)) for s in samples]
+        efficiency_values = [s["fan"].get("efficiency_cfm_w", 0) for s in samples]
+
+        avg_cfm = sum(cfm_values) / len(cfm_values) if cfm_values else 0
+        avg_rpm = sum(rpm_values) / len(rpm_values) if rpm_values else 0
+        avg_watts = sum(watts_values) / len(watts_values) if watts_values else 0
+        avg_efficiency = sum(efficiency_values) / len(efficiency_values) if efficiency_values else 0
+
+        # Mitigation metrics
         total_tar = sum(s["derived"]["tar_cfm_min"] for s in samples)
         total_energy = sum(s["derived"]["energy_wh"] for s in samples)
-        avg_cfm = sum(s["fan"]["cfm"] for s in samples) / len(samples)
-        avg_watts = sum(s["fan"]["watts"] for s in samples) / len(samples)
-        avg_voc = sum(s["environment"]["voc_ppb"] for s in samples) / len(samples)
-        avg_efficiency = avg_cfm / avg_watts if avg_watts > 0 else 0
+        voc_reduction_values = [s["derived"].get("voc_reduction_pct", 0) for s in samples]
+        avg_voc_reduction = sum(voc_reduction_values) / len(voc_reduction_values) if voc_reduction_values else 0
 
-        # Determine eligible minutes (when fan was running)
-        eligible_samples = [s for s in samples if s["fan"]["cfm"] > 0]
-        eligible_minutes = len(eligible_samples) * (SAMPLE_INTERVAL_SECONDS / 60)
-
-        # Build epoch data
+        # Build epoch data in v1 spec format
         epoch_id = f"ep-{start_time.strftime('%Y%m%d%H')}-{DEVICE_ID}"
         epoch_data = {
+            "schema_version": "1.0",
             "epoch_id": epoch_id,
             "device_id": DEVICE_ID,
+            "time": {
+                "start": start_time.isoformat() + "Z",
+                "end": end_time.isoformat() + "Z",
+                "duration_minutes": round(duration_minutes, 1),
+            },
+            "sample_count": len(samples),
+            "summary": {
+                "air_quality": {
+                    "avg_tvoc_ppb": round(avg_tvoc, 1),
+                    "max_tvoc_ppb": round(max_tvoc, 1),
+                    "avg_eco2_ppm": round(avg_eco2, 1),
+                    "avg_pm25_ugm3": round(avg_pm25, 2),
+                    "avg_temp_c": round(avg_temp, 1),
+                    "avg_humidity_pct": round(avg_humidity, 1),
+                    "avg_pressure_pa": round(avg_pressure, 1),
+                },
+                "fan_performance": {
+                    "avg_cfm": round(avg_cfm, 1),
+                    "avg_rpm": round(avg_rpm),
+                    "avg_power_w": round(avg_watts, 1),
+                    "avg_dp_pa": round(avg_pressure, 1),
+                    "avg_efficiency_cfm_w": round(avg_efficiency, 2),
+                },
+                "mitigation": {
+                    "total_tar_cfm_min": round(total_tar, 1),
+                    "total_energy_wh": round(total_energy, 2),
+                    "voc_reduction_pct": round(avg_voc_reduction, 1),
+                },
+                "tokenomics": {
+                    "efficiency_index": 1.0,
+                    "quality_factor": 1.0,
+                    "valid_events_count": 0,
+                    "events_per_epoch": 5,
+                    "epoch_valid": True,
+                    "issued_tokens": 0.0,
+                },
+            },
+            # Backward compatibility fields
             "start_time": start_time.isoformat() + "Z",
             "end_time": end_time.isoformat() + "Z",
-            "summary": {
-                "total_tar_cfm_min": round(total_tar, 1),
-                "eligible_minutes": round(eligible_minutes, 1),
-                "avg_cfm": round(avg_cfm, 1),
-                "avg_watts": round(avg_watts, 1),
-                "avg_voc_ppb": round(avg_voc, 1),
-                "avg_efficiency_cfm_w": round(avg_efficiency, 2),
-                "total_energy_wh": round(total_energy, 2),
-            },
         }
 
         # Calculate token issuance if tokenomics available
@@ -420,6 +495,16 @@ class TelemetryCollector:
                     device_id=DEVICE_ID,
                     samples=samples,
                 )
+                # Update tokenomics section with actual values
+                epoch_data["summary"]["tokenomics"] = {
+                    "efficiency_index": round(issuance_result.ei_clamped, 3),
+                    "quality_factor": round(issuance_result.quality_factor, 3),
+                    "valid_events_count": issuance_result.valid_events,
+                    "events_per_epoch": issuance_result.total_events,
+                    "epoch_valid": issuance_result.valid_events > 0,
+                    "issued_tokens": round(issuance_result.tokens_issued, 4),
+                }
+                # Keep backward-compatible issuance section
                 epoch_data["issuance"] = issuance_result.to_dict()["issuance"]
                 epoch_data["issuance"]["split"] = issuance_result.split.to_dict()
                 epoch_data["issuance"]["validation"] = {
