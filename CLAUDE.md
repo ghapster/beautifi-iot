@@ -61,6 +61,10 @@ beautifi-iot/
 ├── ota/
 │   ├── update_manager.py  # Signed firmware updates, rollback
 │   └── config_manager.py  # Remote configuration
+├── tokenomics/
+│   └── issuance.py        # $BTFI token issuance calculator (whitepaper formula)
+├── evidence/
+│   └── pack_builder.py    # Evidence pack builder + Cloudflare R2 upload
 ├── templates/
 │   ├── index.html         # WiFi setup page
 │   └── fan.html           # Fan control dashboard
@@ -222,6 +226,86 @@ curl http://192.168.0.151:5000/api/telemetry/samples?limit=5
 ```bash
 curl -X POST http://192.168.0.151:5000/api/registration/calibrate -H "Content-Type: application/json" -d '{"duration_minutes": 1}'
 ```
+
+## Architecture Clarification (Important!)
+
+**The whitepaper mentions BNB Greenfield and opBNB, but the actual implementation uses different infrastructure:**
+
+| Whitepaper Mentions | Actual Implementation |
+|---------------------|----------------------|
+| BNB Greenfield (evidence storage) | **Cloudflare R2** (S3-compatible) |
+| opBNB (smart contracts) | BSC Testnet (migration to opBNB not done) |
+| On-chain epoch submission | Backend-managed via SalonSafe API |
+
+### Evidence Storage (Cloudflare R2)
+- Evidence packs are ZIP archives uploaded to R2
+- Storage key format: `epochs/{device_id}/{year}/{month}/{day}/{epoch_id}.zip`
+- Each pack contains: `epoch.json`, `samples.json`, `device_identity.json`, `leaf_hashes.json`, `metadata.json`
+- SHA256 hash computed for integrity verification
+- Config in `.env`: `R2_ENDPOINT_URL`, `R2_ACCESS_KEY_ID`, `R2_SECRET_ACCESS_KEY`, `R2_BUCKET_NAME`
+
+### Tokenomics Module (`tokenomics/issuance.py`)
+Implements the whitepaper formula:
+```
+Tokens = (Base_rate × TAR × EI × Quality_Factor) / BCAI
+```
+- TAR = Toxic Air Removed (CFM-minutes)
+- EI = Energy Input factor (efficiency, clamped 0.8-1.2)
+- Quality_Factor = valid_events / total_events
+- BCAI = BeautiFi Clean Air Index (price adjustment)
+
+Issuance splits: 75% facilities, 5% verifiers, 10% treasury, 10% team (capped at 75M)
+
+### Evidence Pack Builder (`evidence/pack_builder.py`)
+- Builds ZIP archives per epoch with all telemetry and signing data
+- Uploads to Cloudflare R2 with metadata
+- Supports download and verification
+
+### What's NOT Implemented Yet
+1. **Real sensors** - Device runs in `SIMULATION_MODE = True`
+2. **PoC retirement system** - Burn $BTFI → mint soulbound NFT flow
+3. **BCAI dynamic calculation** - Currently uses static `bcai_scalar = 1.0`
+4. **Sponsor dashboard** - vESG reporting interface
+
+### Token Minting - FULLY IMPLEMENTED
+
+**IoT Device** (`tokenomics/issuance.py`):
+- Calculates tokens per epoch using whitepaper formula
+- Integrated with `telemetry/collector.py`
+- No web3 dependency - calculates and reports
+
+**Backend** (`salon-safe-backend/utils/blockchain.js`):
+- `rewardTokens()` - Tries mint first, falls back to transfer
+- `mintTokens()` - Creates new tokens (if rewards wallet is contract owner)
+- `transferTokens()` - Sends from rewards wallet (fallback)
+- Uses ethers.js to interact with deployed SLN token contract
+
+**Auto-Minting Flow** (`routes/telemetry.js`):
+```
+IoT Device                              Backend
+───────────────────────────────────────────────────────────────────
+POST /api/epochs/submit        →  Store epoch in database
+                               →  autoVerifyEpoch() called async
+                               →  Calculate: slnAmount = tarAmount × slnPerTar
+                               →  blockchain.rewardTokens(wallet, sln, epochId)
+                               →  Record tx in tar_rewards_ledger
+                               →  WebSocket emit epoch:verified
+```
+
+**Backend Minting Endpoints**:
+| Endpoint | Purpose |
+|----------|---------|
+| `POST /api/epochs/submit` | Auto-verifies & mints on submission |
+| `POST /api/epochs/verify-onchain/:epochId` | Manual single epoch verification |
+| `POST /api/epochs/verify-all-onchain/:deviceId` | Batch verify all epochs |
+| `GET /api/blockchain/status` | Check blockchain connection |
+
+**Contract ABI** (`contract/abi.json`):
+- `mint(address to, uint256 amount)` - Owner-only minting
+- `burn(uint256 amount)` - Token burning
+- Standard ERC20 functions
+
+**Backend Location**: `C:\Users\CO-OP\salon-safe-backend\`
 
 ## Recent Session Notes (Jan 2026)
 
