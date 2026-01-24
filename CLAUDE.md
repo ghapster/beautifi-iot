@@ -10,8 +10,21 @@ Before starting a new session, reference these key documentation files for full 
 |----------|----------|---------|
 | **System Summary** | `C:\Users\CO-OP\salon-safe-backend\docs\BEAUTIFI_SYSTEM_SUMMARY.md` | Complete system overview, all components, blockchain integration, database schema, API endpoints, recent commits |
 | **Evidence Pack v1 Spec** | `C:\Users\CO-OP\salon-safe-backend\docs\EVIDENCE_PACK_V1_SPEC.md` | Cryptographic evidence pack format specification |
-| **Tokenomics Whitepaper** | `C:\Users\CO-OP\Downloads\BeatutiFI token whitepaper.md` | Token economics and DUAN protocol details |
+| **Tokenomics Whitepaper** | `C:\Users\CO-OP\Downloads\salonsafe-iot\BeautiFi™ Tokenomics Technical White Paper (v1).pdf` | Token economics and DUAN protocol details (GOVERNING DOCUMENT) |
 | **Executive Summary** | `C:\Users\CO-OP\Documents\Beauti Fi™ Executive Summary & Key Sections (neat Format).docx` | Business overview |
+
+## ⚠️ CRITICAL: Whitepaper vs Implementation
+
+**The Tokenomics Whitepaper is the governing document for this project, with ONE MAJOR EXCEPTION:**
+
+| Whitepaper Mentions | Actual Implementation | Notes |
+|---------------------|----------------------|-------|
+| **BNB Greenfield** (evidence storage) | **Cloudflare R2** (S3-compatible) | Greenfield is NOT implemented |
+| opBNB (smart contracts) | BSC Testnet | Migration to opBNB not done |
+
+**DO NOT attempt to implement BNB Greenfield.** The project uses Cloudflare R2 for all evidence storage. This is intentional and will not change. Evidence packs are uploaded to R2 with the storage key format: `epochs/{device_id}/{year}/{month}/{day}/{epoch_id}.zip`
+
+When reading the whitepaper, follow all specifications EXCEPT storage infrastructure references.
 
 ## Raspberry Pi Access
 
@@ -249,11 +262,13 @@ curl -X POST http://192.168.0.151:5000/api/registration/calibrate -H "Content-Ty
 
 ## Architecture Clarification (Important!)
 
-**The whitepaper mentions BNB Greenfield and opBNB, but the actual implementation uses different infrastructure:**
+**⚠️ REMINDER: BNB Greenfield is NOT implemented. See "CRITICAL: Whitepaper vs Implementation" section above.**
+
+The whitepaper is the governing document, but evidence storage uses Cloudflare R2 instead of BNB Greenfield:
 
 | Whitepaper Mentions | Actual Implementation |
 |---------------------|----------------------|
-| BNB Greenfield (evidence storage) | **Cloudflare R2** (S3-compatible) |
+| BNB Greenfield (evidence storage) | **Cloudflare R2** (S3-compatible) - PERMANENT |
 | opBNB (smart contracts) | BSC Testnet (migration to opBNB not done) |
 | On-chain epoch submission | Backend-managed via SalonSafe API |
 
