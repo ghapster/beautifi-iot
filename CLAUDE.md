@@ -11,6 +11,7 @@ Before starting a new session, reference these key documentation files for full 
 | **System Summary** | `C:\Users\CO-OP\salon-safe-backend\docs\BEAUTIFI_SYSTEM_SUMMARY.md` | Complete system overview, all components, blockchain integration, database schema, API endpoints, recent commits |
 | **Evidence Pack v1 Spec** | `C:\Users\CO-OP\salon-safe-backend\docs\EVIDENCE_PACK_V1_SPEC.md` | Cryptographic evidence pack format specification |
 | **Tokenomics Whitepaper** | `C:\Users\CO-OP\Downloads\salonsafe-iot\BeautiFi™ Tokenomics Technical White Paper (v1).pdf` | Token economics and DUAN protocol details (GOVERNING DOCUMENT) |
+| **Tokenomics Simulator** | `C:\Users\CO-OP\Downloads\salonsafe-iot\BTFI v1 Tokenomics Simulator.xlsx` | Excel model showing how metrics are tabulated and calculated |
 | **Executive Summary** | `C:\Users\CO-OP\Documents\Beauti Fi™ Executive Summary & Key Sections (neat Format).docx` | Business overview |
 
 ## ⚠️ CRITICAL: Whitepaper vs Implementation
