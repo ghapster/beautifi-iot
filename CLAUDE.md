@@ -2,6 +2,26 @@
 
 > This file helps Claude understand the project quickly in new sessions.
 
+## Essential Documentation (READ FIRST)
+
+Before starting a new session, reference these key documentation files for full system context:
+
+| Document | Location | Purpose |
+|----------|----------|---------|
+| **System Summary** | `C:\Users\CO-OP\salon-safe-backend\docs\BEAUTIFI_SYSTEM_SUMMARY.md` | Complete system overview, all components, blockchain integration, database schema, API endpoints, recent commits |
+| **Evidence Pack v1 Spec** | `C:\Users\CO-OP\salon-safe-backend\docs\EVIDENCE_PACK_V1_SPEC.md` | Cryptographic evidence pack format specification |
+| **Tokenomics Whitepaper** | `C:\Users\CO-OP\Downloads\BeatutiFI token whitepaper.md` | Token economics and DUAN protocol details |
+| **Executive Summary** | `C:\Users\CO-OP\Documents\Beauti Fi™ Executive Summary & Key Sections (neat Format).docx` | Business overview |
+
+## Raspberry Pi Access
+
+**IMPORTANT:** SSH access to the Pi uses `pi@` username, NOT `btfi@`:
+```bash
+ssh pi@192.168.0.151
+```
+
+The Pi runs at IP `192.168.0.151` on the local network. The IoT code is located at `/home/pi/salonsafe-iot` on the Pi.
+
 ## What This Is
 
 BeautiFi IoT is a Raspberry Pi-based device for **DUAN (Decentralized Utility Accountability Network) Proof-of-Air compliance**. It controls ventilation fans in nail salons and generates cryptographically signed telemetry proving air quality compliance for blockchain-based rewards (SLN tokens).
@@ -311,6 +331,18 @@ POST /api/epochs/submit        →  Store epoch in database
 
 - Completed all 8 DUAN compliance phases
 - Added WiFi provisioning with AP mode fallback
-- Pi IP on local network: 192.168.0.151
+- Pi IP on local network: `192.168.0.151` (SSH: `pi@192.168.0.151`)
 - Repo: https://github.com/ghapster/beautifi-iot
 - User: ghapster
+- **Admin Dashboard UI** upgraded with BeautiFi branding (slate #546A7B + cream #E8E4D9)
+- Testing on **BSC Testnet with SLN token** (not BTFI yet, not mainnet)
+- Evidence storage uses **Cloudflare R2** (not BNB Greenfield)
+
+### Related Repositories
+| Repo | Local Path | Purpose |
+|------|------------|---------|
+| beautifi-iot | `C:\Users\CO-OP\Downloads\salonsafe-iot\salonsafe-iot` | Raspberry Pi IoT device code |
+| salon-safe-backend | `C:\Users\CO-OP\salon-safe-backend` | Node.js backend API |
+| salonsafe-admin-dashboard | `C:\Users\CO-OP\salonsafe-admin-dashboard` | React admin dashboard |
+
+For complete system documentation including database schema, API endpoints, blockchain integration, and recent commits, see the **System Summary** referenced above.
