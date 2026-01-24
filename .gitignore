@@ -32,3 +32,13 @@ Thumbs.db
 
 # Keys (never commit private keys!)
 .beautifi/
+
+# Test files (development only)
+*_test.py
+test_*/
+
+# Evidence packs (runtime generated)
+evidence_packs/
+
+# Windows artifacts
+nul
