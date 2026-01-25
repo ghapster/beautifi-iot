@@ -2,7 +2,7 @@
 
 > This file helps Claude understand the project quickly in new sessions.
 >
-> **Last Verified:** January 24, 2026
+> **Last Verified:** January 25, 2026
 
 ## Essential Documentation (READ FIRST)
 
@@ -299,17 +299,28 @@ Issuance splits: 75% facilities, 5% verifiers, 10% treasury, 10% team (capped at
 - Uploads to Cloudflare R2 with metadata
 - Supports download and verification
 
-### What's NOT Implemented Yet (Verified Jan 24, 2026)
+### What's NOT Implemented Yet (Verified Jan 25, 2026)
 
 | Item | Status | Location/Notes |
 |------|--------|----------------|
 | **Real sensors** | NOT ACTIVE | `config.py` has `SIMULATION_MODE = True` |
-| **PoC NFT minting** | PARTIAL | Burn works in `routes/poc.js`, NFT mint is TODO (lines 99-100) |
+| **PoC NFT minting** | PARTIAL | Burn + epoch linkage works (`routes/poc.js`), actual NFT mint is TODO |
 | **Dynamic BCAI** | NOT IMPLEMENTED | Static `bcai_scalar = 1.0` in `tokenomics/issuance.py` |
-| **Sponsor dashboard** | NOT IMPLEMENTED | No vESG reporting interface exists |
+| **Sponsor dashboard UI** | NOT IMPLEMENTED | vESG API exists (`routes/vesg.js`) but no frontend |
+| **"Sponsor This Salon" UI** | NOT IMPLEMENTED | Direct salon sponsorship link (Phase 3) |
+| **NFT soulbound verification** | NOT VERIFIED | Need to audit contract for `_beforeTokenTransfer` hook |
 | **Merkle root on-chain** | NOT IMPLEMENTED | Stored in DB only, would need new smart contract |
 | **opBNB integration** | NOT IMPLEMENTED | Intentionally on BSC Testnet for now |
 | **Mainnet deployment** | FUTURE | Waiting for full testing |
+
+### ✅ NEWLY COMPLETED (Jan 25, 2026) - PoC Whitepaper Alignment
+
+| Item | Status | Location |
+|------|--------|----------|
+| **PoC-to-Epoch Linkage** | ✅ COMPLETE | `routes/poc.js` - sponsors retire specific epochs/salons |
+| **vESG Report API** | ✅ COMPLETE | `routes/vesg.js` - JSON-LD format reports |
+| **Epoch Selection UI** | ✅ COMPLETE | `SupporterForm.jsx` - salon/epoch selector |
+| **Migration 007** | ✅ DEPLOYED | `retired_epoch_ids`, `retired_salon_id`, `total_tar_retired` columns |
 
 ### Token Minting & Multi-Wallet Distribution - FULLY IMPLEMENTED
 
@@ -376,6 +387,11 @@ POST /api/epochs/submit        →  Store epoch in database
 - Evidence storage uses **Cloudflare R2** (not BNB Greenfield)
 - **Multi-wallet token distribution LIVE** (Jan 24, 2026) - 4-way split per tokenomics whitepaper
   - First distribution: 180.831 SLN split to Facility (75%), Verifier (5%), Treasury (10%), Team (10%)
+- **PoC Whitepaper Alignment COMPLETE** (Jan 25, 2026) - Phase 1 & 2 deployed
+  - Sponsors can now retire specific epochs/salons via `/api/poc/retire`
+  - vESG reports available via `/api/vesg/report/:wallet`
+  - SupporterForm.jsx updated with salon/epoch selector
+  - Portal working at `salonsafe-register.vercel.app`
 
 ### Miner Dashboard TAR Metrics Update (Jan 24, 2026)
 
