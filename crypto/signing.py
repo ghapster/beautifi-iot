@@ -134,6 +134,53 @@ def verify_signature(
 
 
 # ============================================
+# Sample Formatting for Hashing
+# ============================================
+
+def format_sample_for_hashing(sample: dict, seq: int) -> dict:
+    """
+    Format a sample for consistent hashing.
+
+    This MUST match the format used by pack_builder._format_sample_for_spec()
+    to ensure leaf hashes match what ends up in samples.json.
+
+    Args:
+        sample: Raw telemetry sample
+        seq: Sequence number (0-indexed position in epoch)
+
+    Returns:
+        Formatted sample dict matching Evidence Pack v1 spec
+    """
+    env = sample.get("environment", {})
+    fan = sample.get("fan", {})
+    derived = sample.get("derived", {})
+
+    return {
+        "seq": seq,
+        "timestamp": sample.get("timestamp", ""),
+        "environment": {
+            "tvoc_ppb": env.get("tvoc_ppb", env.get("voc_ppb", 0)),
+            "eco2_ppm": env.get("eco2_ppm", env.get("co2_ppm", 0)),
+            "pm25_ugm3": env.get("pm25_ugm3", 0),
+            "temp_c": env.get("temp_c", env.get("temperature_c", 0)),
+            "humidity_pct": env.get("humidity_pct", 0),
+            "dp_pa": env.get("dp_pa", env.get("delta_p_pa", 0)),
+        },
+        "fan": {
+            "rpm": fan.get("rpm", 0),
+            "power_w": fan.get("power_w", fan.get("watts", 0)),
+            "cfm": fan.get("cfm", 0),
+            "efficiency_cfm_w": fan.get("efficiency_cfm_w", 0),
+        },
+        "derived": {
+            "tar_cfm_min": derived.get("tar_cfm_min", 0),
+            "energy_wh": derived.get("energy_wh", 0),
+        },
+        "anomaly_flags": sample.get("_anomalies", {}).get("types", []),
+    }
+
+
+# ============================================
 # Merkle Tree for Epochs
 # ============================================
 
@@ -190,12 +237,12 @@ def create_merkle_root_from_samples(samples: List[dict]) -> Tuple[str, List[str]
     Returns:
         Tuple of (merkle_root_hex, list_of_sample_hashes)
     """
-    # Canonicalize each sample and convert to bytes
+    # Format each sample to match Evidence Pack v1 spec
+    # This ensures leaf hashes match what ends up in samples.json
     items = []
-    for sample in samples:
-        # Remove signing info for consistent hashing
-        clean_sample = {k: v for k, v in sample.items() if not k.startswith('_')}
-        items.append(canonicalize_json(clean_sample))
+    for i, sample in enumerate(samples):
+        formatted = format_sample_for_hashing(sample, i)
+        items.append(canonicalize_json(formatted))
 
     return create_merkle_root(items)
 

@@ -14,6 +14,11 @@ from pathlib import Path
 from typing import Optional, List, Dict, Any
 from dataclasses import dataclass, field
 
+# Import shared sample formatting from crypto module
+import sys
+sys.path.insert(0, str(Path(__file__).parent.parent))
+from crypto.signing import format_sample_for_hashing
+
 # boto3 for S3-compatible storage (Cloudflare R2)
 try:
     import boto3
@@ -118,34 +123,13 @@ class EvidencePackBuilder:
             print("[EVIDENCE] boto3 not available, upload disabled")
 
     def _format_sample_for_spec(self, sample: dict, seq: int) -> dict:
-        """Format a sample according to Evidence Pack v1 spec."""
-        env = sample.get("environment", {})
-        fan = sample.get("fan", {})
-        derived = sample.get("derived", {})
+        """
+        Format a sample according to Evidence Pack v1 spec.
 
-        return {
-            "seq": seq,
-            "timestamp": sample.get("timestamp", ""),
-            "environment": {
-                "tvoc_ppb": env.get("tvoc_ppb", env.get("voc_ppb", 0)),
-                "eco2_ppm": env.get("eco2_ppm", env.get("co2_ppm", 0)),
-                "pm25_ugm3": env.get("pm25_ugm3", 0),
-                "temp_c": env.get("temp_c", env.get("temperature_c", 0)),
-                "humidity_pct": env.get("humidity_pct", 0),
-                "dp_pa": env.get("dp_pa", env.get("delta_p_pa", 0)),
-            },
-            "fan": {
-                "rpm": fan.get("rpm", 0),
-                "power_w": fan.get("power_w", fan.get("watts", 0)),
-                "cfm": fan.get("cfm", 0),
-                "efficiency_cfm_w": fan.get("efficiency_cfm_w", 0),
-            },
-            "derived": {
-                "tar_cfm_min": derived.get("tar_cfm_min", 0),
-                "energy_wh": derived.get("energy_wh", 0),
-            },
-            "anomaly_flags": sample.get("_anomalies", {}).get("types", []),
-        }
+        Uses shared format_sample_for_hashing() to ensure leaf hashes
+        computed in signing.py match what ends up in samples.json.
+        """
+        return format_sample_for_hashing(sample, seq)
 
     def _format_device_identity_for_spec(self, device_identity: dict, epoch: dict) -> dict:
         """Format device identity according to Evidence Pack v1 spec."""
