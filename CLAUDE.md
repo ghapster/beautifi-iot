@@ -303,30 +303,43 @@ Issuance splits: 75% facilities, 5% verifiers, 10% treasury, 10% team (capped at
 3. **BCAI dynamic calculation** - Currently uses static `bcai_scalar = 1.0`
 4. **Sponsor dashboard** - vESG reporting interface
 
-### Token Minting - FULLY IMPLEMENTED
+### Token Minting & Multi-Wallet Distribution - FULLY IMPLEMENTED
 
 **IoT Device** (`tokenomics/issuance.py`):
 - Calculates tokens per epoch using whitepaper formula
 - Integrated with `telemetry/collector.py`
 - No web3 dependency - calculates and reports
 
-**Backend** (`salon-safe-backend/utils/blockchain.js`):
-- `rewardTokens()` - Tries mint first, falls back to transfer
-- `mintTokens()` - Creates new tokens (if rewards wallet is contract owner)
-- `transferTokens()` - Sends from rewards wallet (fallback)
-- Uses ethers.js to interact with deployed SLN token contract
+**Backend** (`salon-safe-backend/utils/tokenDistributor.js`):
+- 4-way token distribution per tokenomics whitepaper
+- 75% to Facility (salon), 5% to Verifier, 10% to Treasury, 10% to Team
+- Team allocation capped at 75M tokens (overflow goes to Treasury)
+- Records all distributions in `epoch_distributions` table
 
-**Auto-Minting Flow** (`routes/telemetry.js`):
+**Auto-Distribution Flow** (`routes/telemetry.js`):
 ```
 IoT Device                              Backend
 ───────────────────────────────────────────────────────────────────
 POST /api/epochs/submit        →  Store epoch in database
                                →  autoVerifyEpoch() called async
                                →  Calculate: slnAmount = tarAmount × slnPerTar
-                               →  blockchain.rewardTokens(wallet, sln, epochId)
-                               →  Record tx in tar_rewards_ledger
+                               →  tokenDistributor.distributeForEpoch()
+                               →    ├─ 75% → Facility wallet (salon)
+                               →    ├─  5% → Verifier wallet
+                               →    ├─ 10% → Treasury wallet
+                               →    └─ 10% → Team wallet (capped)
+                               →  Record in epoch_distributions table
                                →  WebSocket emit epoch:verified
 ```
+
+**Protocol Wallets (BSC Testnet)**:
+| Wallet | Address |
+|--------|---------|
+| Minter | `0x141bA487c2b408cD24F57bF1A58217be7a7b862A` |
+| Treasury | `0x9Df2BA62Ee0fde4a859901645742FA316082F1A7` |
+| Verifier | `0x34f3914d72e8066db6b251581c3944Ca1EEC61bF` |
+| Team | `0x483Ee111f0E5ba435C26680325eF4af05DEbDFFe` |
+| Liquidity | `0xb57a2C69296f79B9717fA9C27D458b1F6C1c1e35` |
 
 **Backend Minting Endpoints**:
 | Endpoint | Purpose |
@@ -353,6 +366,41 @@ POST /api/epochs/submit        →  Store epoch in database
 - **Admin Dashboard UI** upgraded with BeautiFi branding (slate #546A7B + cream #E8E4D9)
 - Testing on **BSC Testnet with SLN token** (not BTFI yet, not mainnet)
 - Evidence storage uses **Cloudflare R2** (not BNB Greenfield)
+- **Multi-wallet token distribution LIVE** (Jan 24, 2026) - 4-way split per tokenomics whitepaper
+  - First distribution: 180.831 SLN split to Facility (75%), Verifier (5%), Treasury (10%), Team (10%)
+
+### Miner Dashboard TAR Metrics Update (Jan 24, 2026)
+
+Updated the **Miner Dashboard** (`salonsafe-vite`) to align with TAR-based metrics system:
+
+**Metrics Transition (CF → TAR)**:
+| Old Metric | New Metric |
+|------------|------------|
+| Total Airflow (CF) | Total TAR (CFM-min) |
+| Airflow Rate (CF/day) | Device CFM (real-time) |
+| Mining Rate (SLN/day) | Quality Factor + Epochs |
+
+**New Components Created**:
+| Component | Purpose |
+|-----------|---------|
+| `TARMetricsCard.jsx` | Reusable metric card with CountUp animation |
+| `DeviceList.jsx` | Accordion list of devices per salon |
+| `DeviceDetailPanel.jsx` | Telemetry view (CFM, VOC, temp, humidity) |
+| `FanControlToggle.jsx` | Remote fan on/off switch |
+
+**UI Changes**:
+- Added Overview tab showing aggregated stats across all salons
+- NFT tabs now display salon names: "NFT 1: Salon Name"
+- Device accordion integrated under each salon tab
+- Removed fake airflow counter - now uses real backend data
+- ClaimRewardModal updated with TAR-based claim summary
+
+**New API Integration**:
+- `GET /api/device/:deviceId/status` - Device TAR, epochs, online status
+- `GET /api/telemetry/recent/:deviceId` - Real-time CFM, VOC, temp
+- `POST /api/device/:deviceId/command` - Fan control
+
+**Commit**: `cc387eb` - Pushed to `https://github.com/ghapster/salonsafe-dashboard.git`
 
 ### Related Repositories
 | Repo | Local Path | Purpose |
@@ -360,5 +408,6 @@ POST /api/epochs/submit        →  Store epoch in database
 | beautifi-iot | `C:\Users\CO-OP\Downloads\salonsafe-iot\salonsafe-iot` | Raspberry Pi IoT device code |
 | salon-safe-backend | `C:\Users\CO-OP\salon-safe-backend` | Node.js backend API |
 | salonsafe-admin-dashboard | `C:\Users\CO-OP\salonsafe-admin-dashboard` | React admin dashboard |
+| salonsafe-vite | `C:\Users\CO-OP\salonsafe-vite` | Miner Dashboard (RainbowKit + Vite) |
 
 For complete system documentation including database schema, API endpoints, blockchain integration, and recent commits, see the **System Summary** referenced above.
