@@ -1,6 +1,8 @@
 # BeautiFi IoT - Project Context for Claude
 
 > This file helps Claude understand the project quickly in new sessions.
+>
+> **Last Verified:** January 24, 2026
 
 ## Essential Documentation (READ FIRST)
 
@@ -297,11 +299,17 @@ Issuance splits: 75% facilities, 5% verifiers, 10% treasury, 10% team (capped at
 - Uploads to Cloudflare R2 with metadata
 - Supports download and verification
 
-### What's NOT Implemented Yet
-1. **Real sensors** - Device runs in `SIMULATION_MODE = True`
-2. **PoC retirement system** - Burn $BTFI → mint soulbound NFT flow
-3. **BCAI dynamic calculation** - Currently uses static `bcai_scalar = 1.0`
-4. **Sponsor dashboard** - vESG reporting interface
+### What's NOT Implemented Yet (Verified Jan 24, 2026)
+
+| Item | Status | Location/Notes |
+|------|--------|----------------|
+| **Real sensors** | NOT ACTIVE | `config.py` has `SIMULATION_MODE = True` |
+| **PoC NFT minting** | PARTIAL | Burn works in `routes/poc.js`, NFT mint is TODO (lines 99-100) |
+| **Dynamic BCAI** | NOT IMPLEMENTED | Static `bcai_scalar = 1.0` in `tokenomics/issuance.py` |
+| **Sponsor dashboard** | NOT IMPLEMENTED | No vESG reporting interface exists |
+| **Merkle root on-chain** | NOT IMPLEMENTED | Stored in DB only, would need new smart contract |
+| **opBNB integration** | NOT IMPLEMENTED | Intentionally on BSC Testnet for now |
+| **Mainnet deployment** | FUTURE | Waiting for full testing |
 
 ### Token Minting & Multi-Wallet Distribution - FULLY IMPLEMENTED
 
