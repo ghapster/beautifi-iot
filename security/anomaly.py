@@ -52,7 +52,7 @@ class AnomalyReport:
     value: Any                          # The anomalous value
     expected_range: Optional[Tuple[float, float]] = None  # Expected min/max
     message: str = ""
-    timestamp: str = field(default_factory=lambda: datetime.now(timezone.utc).isoformat() + "Z")
+    timestamp: str = field(default_factory=lambda: datetime.utcnow().isoformat() + "Z")
     sample_hash: Optional[str] = None   # Hash of the sample if available
 
     def to_dict(self) -> dict:
@@ -639,7 +639,7 @@ class AnomalyDetector:
                     stats.std_dev,
                     stats.min_val if stats.min_val != float('inf') else None,
                     stats.max_val if stats.max_val != float('-inf') else None,
-                    datetime.now(timezone.utc).isoformat() + "Z",
+                    datetime.utcnow().isoformat() + "Z",
                 ))
 
         conn.commit()
