@@ -993,6 +993,9 @@ class CommandPoller:
         try:
             if cmd_type == 'fan':
                 success = self._handle_fan_command(cmd_value)
+            elif cmd_type == 'set_speed':
+                # Direct speed control (0-100)
+                success = self._handle_fan_command(cmd_value)
             else:
                 error = f"Unknown command: {cmd_type}"
                 print(f"[CMD] {error}")
