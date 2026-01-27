@@ -303,6 +303,25 @@ Issuance splits: 75% facilities, 5% verifiers, 10% treasury, 10% team (capped at
 3. **BCAI dynamic calculation** - Currently uses static `bcai_scalar = 1.0`
 4. **Sponsor dashboard** - vESG reporting interface
 
+### Future Configuration Change: Single Fan Support
+**REMINDER:** The new ventilation system only requires 1 external fan (the sister component has internal fans). When transitioning:
+
+1. Update `config.py` - Change `FAN_PWM_PINS` from 3 fans to 1:
+   ```python
+   FAN_PWM_PINS = {
+       "Fan 1": 18,
+   }
+   ```
+
+2. Update `FAN_SPECS` if the new fan has different CFM/RPM/Watt specs
+
+3. Current code works fine with 1 fan (unused GPIO pins just output to nothing), but updating the config will:
+   - Stop PWM signals to unused pins
+   - Report accurate `fan_count: 1` in telemetry
+   - Remove unnecessary 5-second staggered startup delays
+
+**Note:** CFM calculations already use single-fan specs (402 CFM max for AC Infinity S6), not multiplied by 3.
+
 ### Token Minting - FULLY IMPLEMENTED
 
 **IoT Device** (`tokenomics/issuance.py`):
