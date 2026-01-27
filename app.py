@@ -1012,7 +1012,7 @@ class CommandPoller:
         global current_speeds
 
         if value == 'on':
-            target_speed = 50  # Default to 50% when turned on
+            target_speed = 100  # Full speed when turned on
         elif value == 'off':
             target_speed = 0
         else:
