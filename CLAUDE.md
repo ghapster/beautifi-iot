@@ -343,6 +343,39 @@ POST /api/epochs/submit        →  Store epoch in database
 
 **Backend Location**: `C:\Users\CO-OP\salon-safe-backend\`
 
+## Remote Fan Control (Jan 27, 2026)
+
+The IoT device now supports remote fan control from the Miner Dashboard via a command polling system.
+
+### CommandPoller Class (`app.py`)
+- Polls backend every 10 seconds for pending commands
+- Handles command types: `fan` (on/off), `set_speed` (0-100%)
+- Acknowledges commands after execution
+- Runs in background thread
+
+### Command Flow
+```
+Dashboard                    Backend                         IoT Device
+─────────────────────────────────────────────────────────────────────────
+Toggle On/Off     →   POST /api/devices/:id/command   →   CommandPoller polls
+                      (queued in device_commands)          every 10 seconds
+                                                      →   GET /commands/pending
+                                                      →   Execute: set fan speed
+                                                      →   POST /commands/:id/ack
+```
+
+### Supported Commands
+| Command | Value | Action |
+|---------|-------|--------|
+| `fan` | `on` | Set all fans to 100% |
+| `fan` | `off` | Set all fans to 0% |
+| `set_speed` | `0-100` | Set all fans to specific percentage |
+
+### Dashboard Fan Controls
+- **On/Off Toggle**: Visible in device row, turns fans to 100% when on
+- **Speed Buttons**: 50% and 100% presets in expanded device panel
+- **Real-time Telemetry**: Polls every 30s when device expanded
+
 ## Recent Session Notes (Jan 2026)
 
 - Completed all 8 DUAN compliance phases
@@ -353,6 +386,8 @@ POST /api/epochs/submit        →  Store epoch in database
 - **Admin Dashboard UI** upgraded with BeautiFi branding (slate #546A7B + cream #E8E4D9)
 - Testing on **BSC Testnet with SLN token** (not BTFI yet, not mainnet)
 - Evidence storage uses **Cloudflare R2** (not BNB Greenfield)
+- **Remote Fan Control** - Dashboard can toggle fans on/off and set speed (50%/100%)
+- **Miner Dashboard** - Real-time telemetry display, TAR-based rewards, community stats
 
 ### Related Repositories
 | Repo | Local Path | Purpose |
@@ -360,5 +395,6 @@ POST /api/epochs/submit        →  Store epoch in database
 | beautifi-iot | `C:\Users\CO-OP\Downloads\salonsafe-iot\salonsafe-iot` | Raspberry Pi IoT device code |
 | salon-safe-backend | `C:\Users\CO-OP\salon-safe-backend` | Node.js backend API |
 | salonsafe-admin-dashboard | `C:\Users\CO-OP\salonsafe-admin-dashboard` | React admin dashboard |
+| salonsafe-vite | `C:\Users\CO-OP\salonsafe-vite` | React miner dashboard (Vite) |
 
 For complete system documentation including database schema, API endpoints, blockchain integration, and recent commits, see the **System Summary** referenced above.
