@@ -389,6 +389,13 @@ Toggle On/Off     →   POST /api/devices/:id/command   →   CommandPoller poll
 - **Remote Fan Control** - Dashboard can toggle fans on/off and set speed (50%/100%)
 - **Miner Dashboard** - Real-time telemetry display, TAR-based rewards, community stats
 
+### Miner Dashboard Cleanup (Jan 27, 2026)
+- Removed dead code: `calculateOperatingMinutes` function, unused imports
+- Removed commented-out Pledge/Vesting/Ad code blocks
+- Removed PledgeModal, ClaimPledgeModal imports and pledge-related state
+- Updated footer branding from "SalonSafe, LLC" to "BeautiFi"
+- Deleted legacy `walletConfig-v1.js` file
+
 ### Related Repositories
 | Repo | Local Path | Purpose |
 |------|------------|---------|
