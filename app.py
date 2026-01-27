@@ -895,6 +895,9 @@ def cleanup():
     """Clean up GPIO, stop telemetry, and stop verifier on exit."""
     print("\n[CLEAN] Cleaning up...")
 
+    # Stop command polling
+    command_poller.stop()
+
     # Stop verifier sync
     if verifier_client:
         verifier_client.stop()
@@ -917,6 +920,136 @@ atexit.register(cleanup)
 
 
 # ============================================
+# Remote Command Polling
+# ============================================
+
+import requests
+
+class CommandPoller:
+    """Polls backend for pending commands and executes them."""
+
+    def __init__(self, device_id, backend_url, poll_interval=10):
+        self.device_id = device_id
+        self.backend_url = backend_url.rstrip('/')
+        self.poll_interval = poll_interval
+        self._running = False
+        self._thread = None
+
+    def start(self):
+        """Start command polling in background thread."""
+        if self._running:
+            return
+        self._running = True
+        self._thread = threading.Thread(target=self._poll_loop, daemon=True)
+        self._thread.start()
+        print(f"[CMD] Command polling started (every {self.poll_interval}s)")
+
+    def stop(self):
+        """Stop command polling."""
+        self._running = False
+        if self._thread:
+            self._thread.join(timeout=5)
+        print("[CMD] Command polling stopped")
+
+    def _poll_loop(self):
+        """Main polling loop."""
+        while self._running:
+            try:
+                self._check_commands()
+            except Exception as e:
+                print(f"[CMD] Poll error: {e}")
+            time.sleep(self.poll_interval)
+
+    def _check_commands(self):
+        """Check for and execute pending commands."""
+        try:
+            url = f"{self.backend_url}/api/devices/{self.device_id}/commands/pending"
+            response = requests.get(url, timeout=10)
+
+            if response.status_code != 200:
+                return
+
+            data = response.json()
+            commands = data.get('commands', [])
+
+            for cmd in commands:
+                self._execute_command(cmd)
+
+        except requests.RequestException as e:
+            # Silently ignore connection errors (backend may be unavailable)
+            pass
+
+    def _execute_command(self, cmd):
+        """Execute a single command."""
+        cmd_id = cmd.get('id')
+        cmd_type = cmd.get('command')
+        cmd_value = cmd.get('value')
+
+        print(f"[CMD] Received: {cmd_type} = {cmd_value}")
+
+        success = False
+        error = None
+
+        try:
+            if cmd_type == 'fan':
+                success = self._handle_fan_command(cmd_value)
+            else:
+                error = f"Unknown command: {cmd_type}"
+                print(f"[CMD] {error}")
+
+        except Exception as e:
+            error = str(e)
+            print(f"[CMD] Execution error: {e}")
+
+        # Acknowledge command
+        self._ack_command(cmd_id, success, error)
+
+    def _handle_fan_command(self, value):
+        """Handle fan on/off command."""
+        global current_speeds
+
+        if value == 'on':
+            target_speed = 50  # Default to 50% when turned on
+        elif value == 'off':
+            target_speed = 0
+        else:
+            # Try to parse as integer speed
+            try:
+                target_speed = int(value)
+            except ValueError:
+                print(f"[CMD] Invalid fan value: {value}")
+                return False
+
+        print(f"[CMD] Setting fans to {target_speed}%")
+
+        # Set all fans to target speed
+        for name in FAN_PWM_PINS:
+            current_speeds[name] = target_speed
+            if RUNNING_ON_PI and name in pwms:
+                pwms[name].ChangeDutyCycle(target_speed)
+
+        print(f"[CMD] Fans set to {target_speed}%")
+        return True
+
+    def _ack_command(self, cmd_id, success, error=None):
+        """Acknowledge command execution to backend."""
+        try:
+            url = f"{self.backend_url}/api/devices/{self.device_id}/commands/{cmd_id}/ack"
+            response = requests.post(url, json={
+                'success': success,
+                'error': error
+            }, timeout=10)
+            if response.status_code == 200:
+                print(f"[CMD] Acknowledged: {cmd_id}")
+        except Exception as e:
+            print(f"[CMD] Ack failed: {e}")
+
+
+# Initialize command poller
+command_poller = CommandPoller(DEVICE_ID, BACKEND_URL, poll_interval=10)
+
+
+# ============================================
 # Main Entry Point
 # ============================================
 
@@ -936,6 +1069,9 @@ if __name__ == '__main__':
 
     # Auto-start telemetry collection
     telemetry_collector.start()
+
+    # Start command polling for remote fan control
+    command_poller.start()
 
     # Run Flask server
     app.run(host='0.0.0.0', port=5000, debug=False)
