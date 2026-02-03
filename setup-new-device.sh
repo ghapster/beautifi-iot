@@ -112,7 +112,7 @@ echo ".env created"
 echo ""
 echo -e "${GREEN}[7/8] Setting up systemd services...${NC}"
 
-# WiFi boot check service
+# WiFi boot check service (runs as root to configure networking)
 sudo tee /etc/systemd/system/beautifi-wifi.service > /dev/null << EOF
 [Unit]
 Description=BeautiFi WiFi Boot Check
@@ -123,7 +123,6 @@ After=network.target
 Type=oneshot
 ExecStart=$INSTALL_DIR/venv/bin/python3 $INSTALL_DIR/wifi_boot.py
 WorkingDirectory=$INSTALL_DIR
-User=pi
 RemainAfterExit=yes
 
 [Install]
