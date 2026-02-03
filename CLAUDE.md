@@ -395,7 +395,35 @@ Toggle On/Off     →   POST /api/devices/:id/command   →   CommandPoller poll
 - **Speed Buttons**: 50% and 100% presets in expanded device panel
 - **Real-time Telemetry**: Polls every 30s when device expanded
 
-## Recent Session Notes (Jan 2026)
+## Recent Session Notes (Feb 2026)
+
+### Prototype Device Setup (Feb 3, 2026)
+Set up 3 new prototype Raspberry Pi devices with Pi OS 32-bit Lite:
+
+| Device | Hostname | IP (DHCP) | Device ID |
+|--------|----------|-----------|-----------|
+| Prototype 1 | beautifi-4 | 192.168.0.119 | btfi-49311ccf334d9d45 |
+| Prototype 2 | beautifi-3 | 192.168.0.168 | btfi-5e93d18822a826b3 |
+| Prototype 3 | beautifi-2 | 192.168.0.134 | btfi-9c5263e883ee1b97 |
+
+### WiFi Provisioning Fixes (Feb 3, 2026)
+Fixed multiple issues with the WiFi AP mode provisioning flow:
+
+| Issue | Fix |
+|-------|-----|
+| hostapd/dnsmasq not installed | Added to `setup-new-device.sh` |
+| hostapd masked by default on Pi OS | Added `systemctl unmask hostapd` |
+| hostapd auto-starting on boot | Disabled auto-start; `wifi_boot.py` controls it |
+| `beautifi-wifi.service` running as `pi` | Changed to run as root (needs root for networking) |
+| "load failed" error on WiFi connect | Added background thread + 2s delay before stopping AP |
+| Wrong interface `p2p-dev-wlan0` detected | Fixed `_get_wifi_interface()` to skip p2p devices |
+
+### Known Issues / TODO
+- **WiFi Provisioning UI** (Low Priority): The setup interface at `192.168.4.1:5000` is functional but not polished. Network scanning doesn't work in AP mode (hardware limitation - wlan0 can't scan while running hostapd). Manual SSID entry works correctly. Needs UI/UX improvements after IoT testing is complete.
+
+---
+
+## Session Notes (Jan 2026)
 
 - Completed all 8 DUAN compliance phases
 - Added WiFi provisioning with AP mode fallback
