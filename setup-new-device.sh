@@ -38,13 +38,13 @@ if [ "$USER" != "pi" ]; then
 fi
 
 # Step 1: System dependencies
-echo -e "${GREEN}[1/7] Updating system and installing dependencies...${NC}"
+echo -e "${GREEN}[1/8] Updating system and installing dependencies...${NC}"
 sudo apt-get update
-sudo apt-get install -y git python3-pip python3-venv python3-dev libffi-dev build-essential
+sudo apt-get install -y git python3-pip python3-venv python3-dev libffi-dev build-essential hostapd dnsmasq
 
 # Step 2: Clone repository
 echo ""
-echo -e "${GREEN}[2/7] Cloning BeautiFi IoT from GitHub...${NC}"
+echo -e "${GREEN}[2/8] Cloning BeautiFi IoT from GitHub...${NC}"
 if [ -d "$INSTALL_DIR" ]; then
     echo "Directory exists, pulling latest..."
     cd "$INSTALL_DIR"
@@ -54,24 +54,51 @@ else
     cd "$INSTALL_DIR"
 fi
 
-# Step 3: Python virtual environment
+# Step 3: Configure hostapd and dnsmasq for AP mode
 echo ""
-echo -e "${GREEN}[3/7] Creating Python virtual environment...${NC}"
+echo -e "${GREEN}[3/8] Configuring WiFi AP mode (hostapd/dnsmasq)...${NC}"
+
+# Copy hostapd config
+sudo cp "$INSTALL_DIR/hostapd.conf" /etc/hostapd/hostapd.conf
+sudo chmod 644 /etc/hostapd/hostapd.conf
+
+# Tell hostapd to use our config file
+sudo sed -i 's|^#DAEMON_CONF=.*|DAEMON_CONF="/etc/hostapd/hostapd.conf"|' /etc/default/hostapd 2>/dev/null || \
+    echo 'DAEMON_CONF="/etc/hostapd/hostapd.conf"' | sudo tee /etc/default/hostapd > /dev/null
+
+# Configure dnsmasq for AP mode (only used when in AP mode)
+sudo cp "$INSTALL_DIR/dnsmasq-hotspot.conf" /etc/dnsmasq.d/beautifi-hotspot.conf
+sudo chmod 644 /etc/dnsmasq.d/beautifi-hotspot.conf
+
+# Disable hostapd and dnsmasq from auto-starting (we start them manually in AP mode)
+sudo systemctl disable hostapd 2>/dev/null || true
+sudo systemctl disable dnsmasq 2>/dev/null || true
+sudo systemctl stop hostapd 2>/dev/null || true
+sudo systemctl stop dnsmasq 2>/dev/null || true
+
+# Unmask hostapd (it's often masked by default on Raspberry Pi OS)
+sudo systemctl unmask hostapd 2>/dev/null || true
+
+echo "hostapd and dnsmasq configured for AP mode"
+
+# Step 4: Python virtual environment
+echo ""
+echo -e "${GREEN}[4/8] Creating Python virtual environment...${NC}"
 cd "$INSTALL_DIR"
 python3 -m venv venv
 source venv/bin/activate
 
-# Step 4: Install Python packages
+# Step 5: Install Python packages
 echo ""
-echo -e "${GREEN}[4/7] Installing Python packages...${NC}"
+echo -e "${GREEN}[5/8] Installing Python packages...${NC}"
 pip install --upgrade pip
 pip install wheel
 pip install -r requirements.txt
 pip install RPi.GPIO
 
-# Step 5: Create .env file
+# Step 6: Create .env file
 echo ""
-echo -e "${GREEN}[5/7] Creating .env configuration...${NC}"
+echo -e "${GREEN}[6/8] Creating .env configuration...${NC}"
 cat > "$INSTALL_DIR/.env" << 'ENVFILE'
 R2_ENDPOINT_URL=https://56b78a569ec9d97475a8dc70cdb818c9.r2.cloudflarestorage.com
 R2_ACCESS_KEY_ID=73f638f06feb1f4e6a37341a871b7353
@@ -81,9 +108,9 @@ R2_TOKEN_VALUE=Pui1XYh4EgR8F4WrKtMKbSHOccdtynVxYmkFgibO
 ENVFILE
 echo ".env created"
 
-# Step 6: Create systemd services
+# Step 7: Create systemd services
 echo ""
-echo -e "${GREEN}[6/7] Setting up systemd services...${NC}"
+echo -e "${GREEN}[7/8] Setting up systemd services...${NC}"
 
 # WiFi boot check service
 sudo tee /etc/systemd/system/beautifi-wifi.service > /dev/null << EOF
@@ -127,9 +154,9 @@ sudo systemctl daemon-reload
 sudo systemctl enable beautifi-wifi.service
 sudo systemctl enable beautifi-iot.service
 
-# Step 7: Start services
+# Step 8: Start services
 echo ""
-echo -e "${GREEN}[7/7] Starting BeautiFi IoT service...${NC}"
+echo -e "${GREEN}[8/8] Starting BeautiFi IoT service...${NC}"
 sudo systemctl start beautifi-iot.service
 
 sleep 5
