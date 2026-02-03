@@ -418,6 +418,28 @@ Fixed multiple issues with the WiFi AP mode provisioning flow:
 | "load failed" error on WiFi connect | Added background thread + 2s delay before stopping AP |
 | Wrong interface `p2p-dev-wlan0` detected | Fixed `_get_wifi_interface()` to skip p2p devices |
 
+### All Prototypes Operational (Feb 3, 2026)
+Completed setup and testing of all 3 prototype devices:
+
+| Device | Status | Notes |
+|--------|--------|-------|
+| IoT #2 (beautifi-2) | ✅ Working | Replaced damaged SN74 chip |
+| IoT #3 (beautifi-3) | ✅ Working | Installed hostapd/dnsmasq, reoriented SN74 |
+| IoT #4 (beautifi-4) | ✅ Working | Full WiFi provisioning + fan control tested |
+
+### Hardware Issues Resolved (Feb 3, 2026)
+
+**SN74AHCT125 Orientation Issue:**
+- Multiple units had SN74 chip rotated 180° incorrectly
+- Symptom: Chip gets very hot, fan control doesn't work
+- Fix: Rotate chip so pin 1 (dot/notch indicator) is in correct position
+- IoT #2 required full chip replacement (damaged from overheating)
+
+**USB-C Breakout Board Variations:**
+- Different manufacturers use different pin labels
+- Solution: Use identical breakout boards across all units
+- Reference wiring from IoT #1: Pin 1 (GND/B1) and Pin 6 (A8/B6)
+
 ### Known Issues / TODO
 - **WiFi Provisioning UI** (Low Priority): The setup interface at `192.168.4.1:5000` is functional but not polished. Network scanning doesn't work in AP mode (hardware limitation - wlan0 can't scan while running hostapd). Manual SSID entry works correctly. Needs UI/UX improvements after IoT testing is complete.
 
