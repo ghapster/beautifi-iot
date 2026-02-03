@@ -40,7 +40,7 @@ fi
 # Step 1: System dependencies
 echo -e "${GREEN}[1/7] Updating system and installing dependencies...${NC}"
 sudo apt-get update
-sudo apt-get install -y git python3-pip python3-venv python3-dev
+sudo apt-get install -y git python3-pip python3-venv python3-dev libffi-dev build-essential
 
 # Step 2: Clone repository
 echo ""
