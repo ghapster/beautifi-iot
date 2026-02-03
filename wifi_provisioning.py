@@ -70,7 +70,10 @@ class WiFiProvisioning:
         if success:
             for line in output.split('\n'):
                 if ':wifi' in line:
-                    return line.split(':')[0]
+                    device = line.split(':')[0]
+                    # Skip p2p (peer-to-peer) devices - we want the real WiFi interface
+                    if not device.startswith('p2p'):
+                        return device
         return "wlan0"  # Default fallback
 
     # ============================================
