@@ -322,16 +322,25 @@
         const data = await resp.json();
 
         if (data.success) {
+          if (data.connecting) {
+            // Device is switching networks - we'll lose connection
+            showMessage('Connecting to ' + ssid + '... This page will become unresponsive as the hotspot shuts down. Find your device on your main network or check your router.', 'info');
+            btn.textContent = 'Connecting...';
+            // Don't re-enable button - page will become unresponsive
+            return;
+          }
           showMessage('Connected successfully!', 'success');
           setTimeout(checkStatus, 2000);
         } else {
           showMessage(data.message || 'Connection failed', 'error');
         }
-      } catch (e) {
-        showMessage('Connection error: ' + e.message, 'error');
-      } finally {
         btn.disabled = false;
         btn.textContent = 'Connect';
+      } catch (e) {
+        // This is expected when AP mode stops - the connection drops
+        showMessage('Device is attempting to connect. The hotspot has stopped. Look for your device on your main WiFi network.', 'info');
+        btn.textContent = 'Connecting...';
+        // Don't re-enable - page is unresponsive anyway
       }
     }
   </script>

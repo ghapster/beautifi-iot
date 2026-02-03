@@ -352,12 +352,20 @@ def wifi_connect():
             'simulation': True
         })
 
-    success, message = wifi_provisioner.connect_to_wifi(ssid, password)
+    # Start connection attempt in background thread AFTER responding
+    # This prevents the "load failed" error when AP mode stops
+    import threading
+    def delayed_connect():
+        time.sleep(2)  # Wait for response to be sent
+        wifi_provisioner.connect_to_wifi(ssid, password)
 
+    threading.Thread(target=delayed_connect, daemon=True).start()
+
+    # Respond immediately before AP stops
     return jsonify({
-        'success': success,
-        'message': message,
-        'status': wifi_provisioner.get_status()
+        'success': True,
+        'message': f'Connecting to {ssid}... The hotspot will disconnect. Check your router for the device.',
+        'connecting': True
     })
 
 
