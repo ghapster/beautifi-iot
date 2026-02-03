@@ -130,11 +130,23 @@ The device polls the backend every 10 seconds for commands:
 
 ## Prototype Devices (Feb 2026)
 
-| Device | Hostname | Device ID | Notes |
-|--------|----------|-----------|-------|
-| Prototype 1 | beautifi-4 | btfi-49311ccf334d9d45 | WiFi provisioning tested |
-| Prototype 2 | beautifi-3 | btfi-5e93d18822a826b3 | Setup complete |
-| Prototype 3 | beautifi-2 | btfi-9c5263e883ee1b97 | Setup complete |
+| Device | Hostname | Device ID | Status |
+|--------|----------|-----------|--------|
+| IoT #1 | beautifi-1 | (original) | ✅ Production reference unit |
+| IoT #2 | beautifi-2 | btfi-9c5263e883ee1b97 | ✅ Fully operational |
+| IoT #3 | beautifi-3 | btfi-5e93d18822a826b3 | ✅ Fully operational |
+| IoT #4 | beautifi-4 | btfi-49311ccf334d9d45 | ✅ Fully operational |
+
+All prototype devices have:
+- Latest code from GitHub
+- WiFi AP mode provisioning configured (hostapd/dnsmasq)
+- Fan control working via PWM
+
+### Hardware Troubleshooting Notes
+
+**SN74AHCT125 Orientation**: The SN74 logic buffer chip must be oriented correctly with pin 1 (marked by dot/notch) in the correct position. A 180° rotation will cause the chip to overheat and become damaged. If the SN74 gets hot, check orientation immediately and replace with a fresh chip.
+
+**USB-C Breakout Boards**: Use identical breakout boards across all units. Different manufacturers may have different pin labeling. Reference IoT #1 wiring: Pin 1 (GND/B1) and Pin 6 (A8/B6).
 
 ## Known Issues / TODO
 
@@ -152,4 +164,4 @@ The device polls the backend every 10 seconds for commands:
 
 See `CLAUDE.md` for detailed architecture, wiring diagrams, and implementation notes.
 
-*Last Updated: February 3, 2026*
+*Last Updated: February 3, 2026 (All prototypes operational)*
