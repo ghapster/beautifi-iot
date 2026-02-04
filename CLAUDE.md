@@ -440,6 +440,86 @@ Completed setup and testing of all 3 prototype devices:
 - Solution: Use identical breakout boards across all units
 - Reference wiring from IoT #1: Pin 1 (GND/B1) and Pin 6 (A8/B6)
 
+### Session Notes (Feb 4, 2026)
+
+#### All 4 IoT Devices Fully Operational
+Completed final setup and testing of all devices:
+
+| Device | Hostname | Device ID | Status |
+|--------|----------|-----------|--------|
+| IoT #1 | beautifi-1 | btfi-e8a6eb4a363fe54e | ✅ Operational |
+| IoT #2 | beautifi-2 | btfi-9c5263e883ee1b97 | ✅ Operational |
+| IoT #3 | beautifi-3 | btfi-5e93d18822a826b3 | ✅ Operational |
+| IoT #4 | beautifi-4 | btfi-49311ccf334d9d45 | ✅ Operational |
+
+#### Service File Fix Applied
+- IoT #2 and #3 had `User=pi` in `beautifi-wifi.service` which prevented AP mode
+- Fix: `sudo sed -i '/User=pi/d' /etc/systemd/system/beautifi-wifi.service`
+- IoT #1 and #4 were already correct
+
+#### IoT #1 Hostname Changed
+- Changed from `salonsafe-pi` to `beautifi-1` for consistency
+- Commands: `sudo hostnamectl set-hostname beautifi-1` and updated `/etc/hosts`
+
+#### mDNS Support Added
+- Installed `avahi-daemon` on all devices
+- Devices now accessible via `.local` addresses:
+  - `http://beautifi-1.local:5000/dashboard`
+  - `http://beautifi-2.local:5000/dashboard`
+  - `http://beautifi-3.local:5000/dashboard`
+  - `http://beautifi-4.local:5000/dashboard`
+- WiFi setup page shows `.local` URL after connection
+
+#### Device Registration Flow Updated
+- Added `deviceId` field to registration form (`salonsafe-register`)
+- Backend now accepts and stores device ID at registration time
+- Users enter device ID during signup → automatic wallet linking
+- No more manual admin entry of device ID required
+
+**Registration Flow:**
+```
+User gets device → Notes device ID (btfi-xxx)
+       ↓
+Connects to WiFi via hotspot
+       ↓
+Goes to registration portal, connects wallet
+       ↓
+Enters device ID + salon info
+       ↓
+Admin approves → Device linked to wallet → Tokens flow
+```
+
+#### Smart OTA Updates Implemented
+Updates install automatically when safe, not at fixed times:
+
+**Trigger 1: Fans OFF for 5+ minutes**
+- Monitors fan speed continuously
+- When all fans at 0% for 5 min → installs update
+- Salon likely closed, safe to restart
+
+**Trigger 2: On boot if update pending**
+- Checks for updates before fans start
+- Installs immediately if available
+- Catches devices that were powered off
+
+**Backend Commands:**
+| Command | Action |
+|---------|--------|
+| `check_update` | Check for available updates |
+| `perform_update` | Force immediate update |
+
+**OTA Classes Added to `app.py`:**
+- `OTAScheduler` - Smart update scheduling
+- `check_pending_on_boot()` - Boot-time update check
+- `_check_fans_and_install()` - Fan monitoring logic
+
+#### Power Architecture Clarification
+User asked about simplifying to 1 fan. Current setup:
+- 12V adapter powers DROK (→5V for Pi) and PWM-to-0-10V converters
+- AC Infinity S6 fans are AC-powered (plug into wall)
+- Cannot eliminate 12V - needed for 0-10V signal generation
+- Could eliminate DROK if Pi powered separately, but still need 12V for converters
+
 ### Known Issues / TODO
 - **WiFi Provisioning UI** (Low Priority): The setup interface at `192.168.4.1:5000` is functional but not polished. Network scanning doesn't work in AP mode (hardware limitation - wlan0 can't scan while running hostapd). Manual SSID entry works correctly. Needs UI/UX improvements after IoT testing is complete.
 
