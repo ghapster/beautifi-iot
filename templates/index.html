@@ -427,27 +427,16 @@
       btn.innerHTML = '<span class="spinner"></span> Connecting...';
       hideMessage();
 
-      try {
-        const resp = await fetch('/api/wifi/connect', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ ssid, password })
-        });
+      // Show success overlay IMMEDIATELY - don't wait for response
+      // This guarantees user sees it before any connection issues
+      showSuccessOverlay(ssid);
 
-        const data = await resp.json();
-
-        if (data.success) {
-          // Show success overlay IMMEDIATELY before connection drops
-          showSuccessOverlay(ssid);
-        } else {
-          showMessage(data.message || 'Connection failed. Check password and try again.', 'error');
-          btn.disabled = false;
-          btn.textContent = 'Connect to WiFi';
-        }
-      } catch (e) {
-        // Request failed - likely AP already shutting down, show success anyway
-        showSuccessOverlay(ssid);
-      }
+      // Send connect request in background (we don't wait for it)
+      fetch('/api/wifi/connect', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ ssid, password })
+      }).catch(() => {});  // Ignore errors - overlay already shown
     }
   </script>
 </body>
