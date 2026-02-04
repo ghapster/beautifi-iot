@@ -13,20 +13,9 @@
       padding: 20px;
       min-height: 100vh;
     }
-    .container {
-      max-width: 400px;
-      margin: 0 auto;
-    }
-    h1 {
-      text-align: center;
-      margin-bottom: 10px;
-      color: #00d4ff;
-    }
-    .subtitle {
-      text-align: center;
-      color: #888;
-      margin-bottom: 30px;
-    }
+    .container { max-width: 400px; margin: 0 auto; }
+    h1 { text-align: center; margin-bottom: 10px; color: #00d4ff; }
+    .subtitle { text-align: center; color: #888; margin-bottom: 30px; }
     .card {
       background: rgba(255,255,255,0.1);
       border-radius: 12px;
@@ -41,9 +30,7 @@
     }
     .status:last-child { border-bottom: none; }
     .status-label { color: #888; }
-    .status-value { font-weight: bold; }
-    .status-value.connected { color: #00ff88; }
-    .status-value.disconnected { color: #ff6b6b; }
+    .status-value { font-weight: bold; color: #00d4ff; font-family: monospace; }
     input[type="password"], input[type="text"] {
       width: 100%;
       padding: 12px;
@@ -65,383 +52,213 @@
       font-size: 16px;
       font-weight: bold;
       cursor: pointer;
-      transition: background 0.2s;
     }
-    button:hover { background: #00b8e6; }
-    button:disabled {
-      background: #444;
-      color: #888;
-      cursor: not-allowed;
-    }
-    button.secondary {
-      background: rgba(255,255,255,0.1);
-      color: #fff;
-      margin-top: 10px;
-    }
-    button.secondary:hover {
-      background: rgba(255,255,255,0.2);
-    }
+    button:disabled { background: #444; color: #888; }
     .message {
       padding: 12px;
       border-radius: 8px;
       margin-bottom: 15px;
       text-align: center;
+      background: rgba(255,107,107,0.2);
+      color: #ff6b6b;
     }
-    .message.error { background: rgba(255,107,107,0.2); color: #ff6b6b; }
-    .spinner {
-      display: inline-block;
-      width: 20px;
-      height: 20px;
-      border: 2px solid rgba(255,255,255,0.3);
-      border-radius: 50%;
-      border-top-color: #00d4ff;
-      animation: spin 1s linear infinite;
-      margin-right: 10px;
-      vertical-align: middle;
-    }
-    @keyframes spin { to { transform: rotate(360deg); } }
     .hidden { display: none; }
 
-    /* Success Overlay - Full Screen */
-    .success-overlay {
+    /* SUCCESS OVERLAY */
+    #success-overlay {
       position: fixed;
-      top: 0;
-      left: 0;
-      right: 0;
-      bottom: 0;
-      background: linear-gradient(135deg, #0a3d0c 0%, #1a5c1f 100%);
-      z-index: 1000;
-      display: flex;
-      flex-direction: column;
-      align-items: center;
-      justify-content: flex-start;
+      top: 0; left: 0; right: 0; bottom: 0;
+      background: #0a5d0a;
+      z-index: 9999;
       padding: 20px;
+      text-align: center;
       overflow-y: auto;
     }
-    .success-overlay.hidden { display: none; }
-    .success-checkmark {
-      font-size: 60px;
-      margin-bottom: 10px;
-    }
-    .success-title {
-      font-size: 28px;
-      font-weight: bold;
-      color: #00ff88;
-      margin-bottom: 10px;
-      text-align: center;
-    }
-    .screenshot-banner {
-      background: #ff6b6b;
+    #success-overlay.hidden { display: none; }
+    .big-icon { font-size: 80px; margin: 20px 0; }
+    .big-title { font-size: 24px; font-weight: bold; color: #fff; margin-bottom: 20px; }
+    .screenshot-box {
+      background: #ff4444;
       color: #fff;
-      padding: 12px 24px;
+      padding: 15px;
       border-radius: 8px;
-      font-size: 18px;
+      font-size: 20px;
       font-weight: bold;
-      margin-bottom: 20px;
+      margin: 20px 0;
       animation: pulse 1s infinite;
     }
-    @keyframes pulse {
-      0%, 100% { transform: scale(1); }
-      50% { transform: scale(1.05); }
-    }
-    .qr-container {
-      background: #fff;
-      padding: 15px;
-      border-radius: 12px;
-      margin-bottom: 20px;
-    }
-    .qr-container canvas {
-      display: block;
-    }
-    .dashboard-url {
+    @keyframes pulse { 50% { transform: scale(1.03); } }
+    .url-box {
       background: #000;
-      padding: 15px 20px;
+      color: #0f0;
+      padding: 20px;
       border-radius: 8px;
       font-family: monospace;
-      font-size: 14px;
-      color: #00ff88;
-      margin-bottom: 15px;
+      font-size: 16px;
+      margin: 20px 0;
       word-break: break-all;
-      text-align: center;
     }
     .info-box {
       background: rgba(0,0,0,0.3);
-      border-radius: 12px;
-      padding: 20px;
-      margin-bottom: 15px;
-      width: 100%;
-      max-width: 350px;
+      padding: 15px;
+      border-radius: 8px;
+      margin: 15px 0;
+      text-align: left;
     }
-    .info-row {
-      display: flex;
-      justify-content: space-between;
-      margin-bottom: 10px;
-    }
-    .info-row:last-child { margin-bottom: 0; }
+    .info-row { display: flex; justify-content: space-between; margin: 8px 0; }
     .info-label { color: #aaa; }
-    .info-value {
-      color: #00d4ff;
-      font-family: monospace;
-      font-weight: bold;
-    }
-    .countdown {
-      font-size: 16px;
-      color: #ffd700;
-      margin-bottom: 15px;
-    }
-    .next-steps {
+    .info-val { color: #0ff; font-family: monospace; }
+    .instructions {
       background: rgba(0,0,0,0.3);
-      border-radius: 12px;
-      padding: 20px;
-      width: 100%;
-      max-width: 350px;
-      font-size: 14px;
-      line-height: 1.6;
+      padding: 15px;
+      border-radius: 8px;
+      text-align: left;
+      margin-top: 20px;
     }
-    .next-steps h3 {
-      margin: 0 0 10px 0;
-      color: #00ff88;
-    }
-    .next-steps ol {
-      margin: 0;
-      padding-left: 20px;
-    }
-    .next-steps li {
-      margin-bottom: 8px;
-    }
+    .instructions h4 { margin: 0 0 10px 0; color: #0f0; }
+    .instructions ol { margin: 0; padding-left: 20px; }
+    .instructions li { margin: 8px 0; }
+    .fail-section { margin-top: 15px; }
+    .fail-section h4 { color: #ff6b6b; }
   </style>
 </head>
 <body>
-  <!-- Success Overlay (shown after clicking Connect) -->
-  <div id="success-overlay" class="success-overlay hidden">
-    <div class="success-checkmark">⏳</div>
-    <div class="success-title">Connecting to WiFi...</div>
 
-    <div class="screenshot-banner">📸 SCREENSHOT THIS NOW</div>
+<!-- SUCCESS OVERLAY -->
+<div id="success-overlay" class="hidden">
+  <div class="big-icon">⏳</div>
+  <div class="big-title">Connecting to WiFi...</div>
 
-    <div class="qr-container">
-      <canvas id="qr-code"></canvas>
+  <div class="screenshot-box">📸 SCREENSHOT THIS PAGE NOW!</div>
+
+  <div style="color:#aaa;margin-bottom:10px;">Your Dashboard URL:</div>
+  <div class="url-box" id="overlay-url">http://beautifi-1.local:5000/dashboard</div>
+
+  <div class="info-box">
+    <div class="info-row">
+      <span class="info-label">Device ID:</span>
+      <span class="info-val" id="overlay-device-id">loading...</span>
     </div>
-
-    <div class="dashboard-url" id="success-url">http://beautifi-1.local:5000/dashboard</div>
-
-    <div class="info-box">
-      <div class="info-row">
-        <span class="info-label">Device ID:</span>
-        <span class="info-value" id="success-device-id">btfi-xxxxxxxx</span>
-      </div>
-      <div class="info-row">
-        <span class="info-label">Network:</span>
-        <span class="info-value" id="success-network">Your WiFi</span>
-      </div>
+    <div class="info-row">
+      <span class="info-label">Connecting to:</span>
+      <span class="info-val" id="overlay-ssid">-</span>
     </div>
+  </div>
 
-    <div class="countdown" id="countdown">Hotspot closing in <span id="countdown-seconds">15</span> seconds...</div>
+  <div class="instructions">
+    <h4>✅ If connection succeeds:</h4>
+    <ol>
+      <li>Connect your phone to <strong id="overlay-ssid2">your WiFi</strong></li>
+      <li>Open the URL shown above in your browser</li>
+      <li>Bookmark it for easy access!</li>
+    </ol>
 
-    <div class="next-steps">
-      <h3>If connection SUCCEEDS:</h3>
-      <ol>
-        <li>Connect your phone/laptop to <strong id="network-name-reminder">your WiFi</strong></li>
-        <li>Open the URL above OR scan the QR code</li>
-        <li>You'll see your fan controls!</li>
-      </ol>
-      <h3 style="margin-top:15px; color:#ff6b6b;">If connection FAILS:</h3>
+    <div class="fail-section">
+      <h4>❌ If connection fails (wrong password):</h4>
       <ol>
         <li>The <strong>BeautiFi-Setup</strong> hotspot will reappear</li>
-        <li>Reconnect to it and try again with correct password</li>
+        <li>Reconnect to it and try again</li>
       </ol>
     </div>
   </div>
+</div>
 
-  <!-- Main Setup Page -->
-  <div class="container" id="main-container">
-    <h1>BeautiFi Setup</h1>
-    <p class="subtitle">Air Quality Monitor</p>
+<!-- MAIN PAGE -->
+<div class="container" id="main-page">
+  <h1>BeautiFi Setup</h1>
+  <p class="subtitle">Air Quality Monitor</p>
 
-    <!-- Device Info Card -->
-    <div class="card">
-      <div class="status">
-        <span class="status-label">Device ID</span>
-        <span class="status-value" id="device-id" style="color:#00d4ff;font-family:monospace;">Loading...</span>
-      </div>
-      <div class="status">
-        <span class="status-label">Status</span>
-        <span class="status-value" id="conn-status">Checking...</span>
-      </div>
-      <p style="font-size:12px;color:#888;margin:10px 0 0 0;">Save your Device ID for registration at the rewards portal.</p>
+  <div class="card">
+    <div class="status">
+      <span class="status-label">Device ID</span>
+      <span class="status-value" id="device-id">Loading...</span>
     </div>
-
-    <!-- Message Area -->
-    <div id="message" class="message hidden"></div>
-
-    <!-- WiFi Setup Card -->
-    <div class="card">
-      <h3 style="margin-top:0;">Connect to Your WiFi</h3>
-      <p style="font-size:13px;color:#888;margin-bottom:15px;">Enter your home/business WiFi credentials:</p>
-
-      <input type="text" id="ssid-input" placeholder="WiFi Network Name (SSID)">
-      <input type="password" id="password-input" placeholder="WiFi Password">
-
-      <button id="connect-btn" onclick="connectWifi()">Connect to WiFi</button>
-    </div>
-
-    <!-- Already Connected -->
-    <div id="already-connected" class="card hidden" style="background: rgba(0,255,136,0.15); border: 1px solid #00ff88;">
-      <h3 style="margin-top:0; color:#00ff88;">Already Connected!</h3>
-      <p style="font-size:14px;">This device is connected to WiFi. Access your dashboard at:</p>
-      <div class="dashboard-url" id="connected-url" style="margin:15px 0;">http://beautifi-1.local:5000/dashboard</div>
-      <button onclick="window.location.href='/dashboard'">Open Fan Controls</button>
+    <div class="status">
+      <span class="status-label">Status</span>
+      <span class="status-value" id="conn-status" style="color:#888;">Checking...</span>
     </div>
   </div>
 
-  <!-- QR Code Library (minimal inline version) -->
-  <script>
-  // Minimal QR Code generator - generates to canvas
-  var QRCode=function(){function a(a){this.mode=c.MODE_8BIT_BYTE;this.data=a;this.parsedData=[];for(var b=[],d=0;d<this.data.length;d++){var e=this.data.charCodeAt(d);e>65536?(b[0]=240|(1835008&e)>>>18,b[1]=128|(258048&e)>>>12,b[2]=128|(4032&e)>>>6,b[3]=128|63&e):e>2048?(b[0]=224|(61440&e)>>>12,b[1]=128|(4032&e)>>>6,b[2]=128|63&e):e>128?(b[0]=192|(1984&e)>>>6,b[1]=128|63&e):b[0]=e;for(var f=0;f<b.length;f++)this.parsedData.push(b[f]);b=[]}}function b(a,b){this.typeNumber=a;this.errorCorrectLevel=b;this.modules=null;this.moduleCount=0;this.dataCache=null;this.dataList=[]}function i(a,b){if(void 0==a.length)throw Error(a.length+"/"+b);for(var c=0;c<a.length&&0==a[c];)c++;this.num=Array(a.length-c+b);for(var d=0;d<a.length-c;d++)this.num[d]=a[c+d]}function j(a,b){this.totalCount=a;this.dataCount=b}function k(){this.buffer=[];this.length=0}var c={MODE_NUMBER:1,MODE_ALPHA_NUM:2,MODE_8BIT_BYTE:4,MODE_KANJI:8},d={L:1,M:0,Q:3,H:2},e={PATTERN000:0,PATTERN001:1,PATTERN010:2,PATTERN011:3,PATTERN100:4,PATTERN101:5,PATTERN110:6,PATTERN111:7},f={glog:function(a){if(1>a)throw Error("glog("+a+")");return f.LOG_TABLE[a]},gexp:function(a){for(;0>a;)a+=255;for(;256<=a;)a-=255;return f.EXP_TABLE[a]},EXP_TABLE:Array(256),LOG_TABLE:Array(256)},g=0;8>g;g++)f.EXP_TABLE[g]=1<<g;for(g=8;256>g;g++)f.EXP_TABLE[g]=f.EXP_TABLE[g-4]^f.EXP_TABLE[g-5]^f.EXP_TABLE[g-6]^f.EXP_TABLE[g-8];for(g=0;255>g;g++)f.LOG_TABLE[f.EXP_TABLE[g]]=g;i.prototype={get:function(a){return this.num[a]},getLength:function(){return this.num.length},multiply:function(a){for(var b=Array(this.getLength()+a.getLength()-1),c=0;c<this.getLength();c++)for(var d=0;d<a.getLength();d++)b[c+d]^=f.gexp(f.glog(this.get(c))+f.glog(a.get(d)));return new i(b,0)},mod:function(a){if(0>this.getLength()-a.getLength())return this;for(var b=f.glog(this.get(0))-f.glog(a.get(0)),c=Array(this.getLength()),d=0;d<this.getLength();d++)c[d]=this.get(d);for(d=0;d<a.getLength();d++)c[d]^=f.gexp(f.glog(a.get(d))+b);return new i(c,0).mod(a)}};a.prototype={getLength:function(){return this.parsedData.length},write:function(a){for(var b=0;b<this.parsedData.length;b++)a.put(this.parsedData[b],8)}};b.prototype={addData:function(b){this.dataList.push(new a(b));this.dataCache=null},isDark:function(a,b){if(0>a||this.moduleCount<=a||0>b||this.moduleCount<=b)throw Error(a+","+b);return this.modules[a][b]},getModuleCount:function(){return this.moduleCount},make:function(){this.makeImpl(!1,this.getBestMaskPattern())},makeImpl:function(a,c){this.moduleCount=4*this.typeNumber+17;this.modules=Array(this.moduleCount);for(var d=0;d<this.moduleCount;d++){this.modules[d]=Array(this.moduleCount);for(var e=0;e<this.moduleCount;e++)this.modules[d][e]=null}this.setupPositionProbePattern(0,0);this.setupPositionProbePattern(this.moduleCount-7,0);this.setupPositionProbePattern(0,this.moduleCount-7);this.setupPositionAdjustPattern();this.setupTimingPattern();this.setupTypeInfo(a,c);7<=this.typeNumber&&this.setupTypeNumber(a);null==this.dataCache&&(this.dataCache=b.createData(this.typeNumber,this.errorCorrectLevel,this.dataList));this.mapData(this.dataCache,c)},setupPositionProbePattern:function(a,b){for(var c=-1;7>=c;c++)if(!(-1>=a+c||this.moduleCount<=a+c))for(var d=-1;7>=d;d++)-1>=b+d||this.moduleCount<=b+d||(this.modules[a+c][b+d]=0<=c&&6>=c&&(0==d||6==d)||0<=d&&6>=d&&(0==c||6==c)||2<=c&&4>=c&&2<=d&&4>=d?!0:!1)},getBestMaskPattern:function(){for(var a=0,b=0,c=0;8>c;c++){this.makeImpl(!0,c);var d=h.getLostPoint(this);if(0==c||a>d)a=d,b=c}return b},setupTimingPattern:function(){for(var a=8;a<this.moduleCount-8;a++)null==this.modules[a][6]&&(this.modules[a][6]=0==a%2);for(a=8;a<this.moduleCount-8;a++)null==this.modules[6][a]&&(this.modules[6][a]=0==a%2)},setupPositionAdjustPattern:function(){for(var a=h.getPatternPosition(this.typeNumber),b=0;b<a.length;b++)for(var c=0;c<a.length;c++){var d=a[b],e=a[c];if(null==this.modules[d][e])for(var f=-2;2>=f;f++)for(var g=-2;2>=g;g++)this.modules[d+f][e+g]=-2==f||2==f||-2==g||2==g||0==f&&0==g?!0:!1}},setupTypeNumber:function(a){for(var b=h.getBCHTypeNumber(this.typeNumber),c=0;18>c;c++){var d=!a&&1==(b>>c&1);this.modules[Math.floor(c/3)][c%3+this.moduleCount-8-3]=d}for(c=0;18>c;c++)d=!a&&1==(b>>c&1),this.modules[c%3+this.moduleCount-8-3][Math.floor(c/3)]=d},setupTypeInfo:function(a,b){for(var c=h.getBCHTypeInfo(this.errorCorrectLevel<<3|b),d=0;15>d;d++){var e=!a&&1==(c>>d&1);6>d?this.modules[d][8]=e:8>d?this.modules[d+1][8]=e:this.modules[this.moduleCount-15+d][8]=e}for(d=0;15>d;d++)e=!a&&1==(c>>d&1),8>d?this.modules[8][this.moduleCount-d-1]=e:9>d?this.modules[8][15-d-1+1]=e:this.modules[8][15-d-1]=e;this.modules[this.moduleCount-8][8]=!a},mapData:function(a,b){for(var c=-1,d=this.moduleCount-1,e=7,f=0,g=this.moduleCount-1;0<g;g-=2)for(6==g&&g--;;){for(var i=0;2>i;i++)if(null==this.modules[d][g-i]){var j=!1;f<a.length&&(j=1==(a[f]>>>e&1));h.getMask(b,d,g-i)&&(j=!j);this.modules[d][g-i]=j;e--;-1==e&&(f++,e=7)}d+=c;if(0>d||this.moduleCount<=d){d-=c;c=-c;break}}}};b.PAD0=236;b.PAD1=17;b.createData=function(a,c,d){for(var e=j.getRSBlocks(a,c),f=new k,g=0;g<d.length;g++){var i=d[g];f.put(i.mode,4);f.put(i.getLength(),h.getLengthInBits(i.mode,a));i.write(f)}for(g=a=0;g<e.length;g++)a+=e[g].dataCount;if(f.getLengthInBits()>8*a)throw Error("code length overflow. ("+f.getLengthInBits()+">"+8*a+")");for(f.getLengthInBits()+4<=8*a&&f.put(0,4);0!=f.getLengthInBits()%8;)f.putBit(!1);for(;!(f.getLengthInBits()>=8*a);){f.put(b.PAD0,8);if(f.getLengthInBits()>=8*a)break;f.put(b.PAD1,8)}return b.createBytes(f,e)};b.createBytes=function(a,b){for(var c=0,d=0,e=0,g=Array(b.length),j=Array(b.length),k=0;k<b.length;k++){var l=b[k].dataCount,m=b[k].totalCount-l;d=Math.max(d,l);e=Math.max(e,m);g[k]=Array(l);for(var n=0;n<g[k].length;n++)g[k][n]=255&a.buffer[n+c];c+=l;n=h.getErrorCorrectPolynomial(m);l=new i(g[k],n.getLength()-1).mod(n);j[k]=Array(n.getLength()-1);for(n=0;n<j[k].length;n++)m=n+l.getLength()-j[k].length,j[k][n]=0<=m?l.get(m):0}for(n=c=0;n<b.length;n++)c+=b[n].totalCount;c=Array(c);for(n=k=0;n<d;n++)for(a=0;a<b.length;a++)n<g[a].length&&(c[k++]=g[a][n]);for(n=0;n<e;n++)for(a=0;a<b.length;a++)n<j[a].length&&(c[k++]=j[a][n]);return c};var h={PATTERN_POSITION_TABLE:[[],[6,18],[6,22],[6,26],[6,30],[6,34],[6,22,38],[6,24,42],[6,26,46],[6,28,50],[6,30,54],[6,32,58],[6,34,62],[6,26,46,66],[6,26,48,70],[6,26,50,74],[6,30,54,78],[6,30,56,82],[6,30,58,86],[6,34,62,90],[6,28,50,72,94],[6,26,50,74,98],[6,30,54,78,102],[6,28,54,80,106],[6,32,58,84,110],[6,30,58,86,114],[6,34,62,90,118],[6,26,50,74,98,122],[6,30,54,78,102,126],[6,26,52,78,104,130],[6,30,56,82,108,134],[6,34,60,86,112,138],[6,30,58,86,114,142],[6,34,62,90,118,146],[6,30,54,78,102,126,150],[6,24,50,76,102,128,154],[6,28,54,80,106,132,158],[6,32,58,84,110,136,162],[6,26,54,82,110,138,166],[6,30,58,86,114,142,170]],G15:1335,G18:7973,G15_MASK:21522,getBCHTypeInfo:function(a){for(var b=a<<10;0<=h.getBCHDigit(b)-h.getBCHDigit(h.G15);)b^=h.G15<<h.getBCHDigit(b)-h.getBCHDigit(h.G15);return(a<<10|b)^h.G15_MASK},getBCHTypeNumber:function(a){for(var b=a<<12;0<=h.getBCHDigit(b)-h.getBCHDigit(h.G18);)b^=h.G18<<h.getBCHDigit(b)-h.getBCHDigit(h.G18);return a<<12|b},getBCHDigit:function(a){for(var b=0;0!=a;)b++,a>>>=1;return b},getPatternPosition:function(a){return h.PATTERN_POSITION_TABLE[a-1]},getMask:function(a,b,c){switch(a){case e.PATTERN000:return 0==(b+c)%2;case e.PATTERN001:return 0==b%2;case e.PATTERN010:return 0==c%3;case e.PATTERN011:return 0==(b+c)%3;case e.PATTERN100:return 0==(Math.floor(b/2)+Math.floor(c/3))%2;case e.PATTERN101:return 0==b*c%2+b*c%3;case e.PATTERN110:return 0==(b*c%2+b*c%3)%2;case e.PATTERN111:return 0==(b*c%3+(b+c)%2)%2;default:throw Error("bad maskPattern:"+a);}},getErrorCorrectPolynomial:function(a){for(var b=new i([1],0),c=0;c<a;c++)b=b.multiply(new i([1,f.gexp(c)],0));return b},getLengthInBits:function(a,b){if(1<=b&&10>b)switch(a){case c.MODE_NUMBER:return 10;case c.MODE_ALPHA_NUM:return 9;case c.MODE_8BIT_BYTE:return 8;case c.MODE_KANJI:return 8}else if(27>b)switch(a){case c.MODE_NUMBER:return 12;case c.MODE_ALPHA_NUM:return 11;case c.MODE_8BIT_BYTE:return 16;case c.MODE_KANJI:return 10}else if(41>b)switch(a){case c.MODE_NUMBER:return 14;case c.MODE_ALPHA_NUM:return 13;case c.MODE_8BIT_BYTE:return 16;case c.MODE_KANJI:return 12}throw Error("mode:"+a);},getLostPoint:function(a){for(var b=a.getModuleCount(),c=0,d=0;d<b;d++)for(var e=0;e<b;e++){for(var f=0,g=a.isDark(d,e),h=-1;1>=h;h++)if(!(0>d+h||b<=d+h))for(var i=-1;1>=i;i++)0>e+i||b<=e+i||(0!=h||0!=i)&&g==a.isDark(d+h,e+i)&&f++;5<f&&(c+=3+f-5)}for(d=0;d<b-1;d++)for(e=0;e<b-1;e++)if(f=0,a.isDark(d,e)&&f++,a.isDark(d+1,e)&&f++,a.isDark(d,e+1)&&f++,a.isDark(d+1,e+1)&&f++,0==f||4==f)c+=3;for(d=0;d<b;d++)for(e=0;e<b-6;e++)a.isDark(d,e)&&!a.isDark(d,e+1)&&a.isDark(d,e+2)&&a.isDark(d,e+3)&&a.isDark(d,e+4)&&!a.isDark(d,e+5)&&a.isDark(d,e+6)&&(c+=40);for(e=0;e<b;e++)for(d=0;d<b-6;d++)a.isDark(d,e)&&!a.isDark(d+1,e)&&a.isDark(d+2,e)&&a.isDark(d+3,e)&&a.isDark(d+4,e)&&!a.isDark(d+5,e)&&a.isDark(d+6,e)&&(c+=40);for(e=f=0;e<b;e++)for(d=0;d<b;d++)a.isDark(d,e)&&f++;return c+=10*(Math.abs(100*f/b/b-50)/5)}};j.RS_BLOCK_TABLE=[[1,26,19],[1,26,16],[1,26,13],[1,26,9],[1,44,34],[1,44,28],[1,44,22],[1,44,16],[1,70,55],[1,70,44],[2,35,17],[2,35,13],[1,100,80],[2,50,32],[2,50,24],[4,25,9],[1,134,108],[2,67,43],[2,33,15,2,34,16],[2,33,11,2,34,12],[2,86,68],[4,43,27],[4,43,19],[4,43,15],[2,98,78],[4,49,31],[2,32,14,4,33,15],[4,39,13,1,40,14],[2,121,97],[2,60,38,2,61,39],[4,40,18,2,41,19],[4,40,14,2,41,15],[2,146,116],[3,58,36,2,59,37],[4,36,16,4,37,17],[4,36,12,4,37,13],[2,86,68,2,87,69],[4,69,43,1,70,44],[6,43,19,2,44,20],[6,43,15,2,44,16],[4,101,81],[1,80,50,4,81,51],[4,50,22,4,51,23],[3,36,12,8,37,13],[2,116,92,2,117,93],[6,58,36,2,59,37],[4,46,20,6,47,21],[7,42,14,4,43,15],[4,133,107],[8,59,37,1,60,38],[8,44,20,4,45,21],[12,33,11,4,34,12],[3,145,115,1,146,116],[4,64,40,5,65,41],[11,36,16,5,37,17],[11,36,12,5,37,13],[5,109,87,1,110,88],[5,65,41,5,66,42],[5,54,24,7,55,25],[11,36,12],[5,122,98,1,123,99],[7,73,45,3,74,46],[15,43,19,2,44,20],[3,45,15,13,46,16],[1,135,107,5,136,108],[10,74,46,1,75,47],[1,50,22,15,51,23],[2,42,14,17,43,15],[5,150,120,1,151,121],[9,69,43,4,70,44],[17,50,22,1,51,23],[2,42,14,19,43,15],[3,141,113,4,142,114],[3,70,44,11,71,45],[17,47,21,4,48,22],[9,39,13,16,40,14],[3,135,107,5,136,108],[3,67,41,13,68,42],[15,54,24,5,55,25],[15,43,15,10,44,16],[4,144,116,4,145,117],[17,68,42],[17,50,22,6,51,23],[19,46,16,6,47,17],[2,139,111,7,140,112],[17,74,46],[7,54,24,16,55,25],[34,37,13],[4,151,121,5,152,122],[4,75,47,14,76,48],[11,54,24,14,55,25],[16,45,15,14,46,16],[6,147,117,4,148,118],[6,73,45,14,74,46],[11,54,24,16,55,25],[30,46,16,2,47,17],[8,132,106,4,133,107],[8,75,47,13,76,48],[7,54,24,22,55,25],[22,45,15,13,46,16],[10,142,114,2,143,115],[19,74,46,4,75,47],[28,50,22,6,51,23],[33,46,16,4,47,17],[8,152,122,4,153,123],[22,73,45,3,74,46],[8,53,23,26,54,24],[12,45,15,28,46,16],[3,147,117,10,148,118],[3,73,45,23,74,46],[4,54,24,31,55,25],[11,45,15,31,46,16],[7,146,116,7,147,117],[21,73,45,7,74,46],[1,53,23,37,54,24],[19,45,15,26,46,16],[5,145,115,10,146,116],[19,75,47,10,76,48],[15,54,24,25,55,25],[23,45,15,25,46,16],[13,145,115,3,146,116],[2,74,46,29,75,47],[42,54,24,1,55,25],[23,45,15,28,46,16],[17,145,115],[10,74,46,23,75,47],[10,54,24,35,55,25],[19,45,15,35,46,16],[17,145,115,1,146,116],[14,74,46,21,75,47],[29,54,24,19,55,25],[11,45,15,46,46,16],[13,145,115,6,146,116],[14,74,46,23,75,47],[44,54,24,7,55,25],[59,46,16,1,47,17],[12,151,121,7,152,122],[12,75,47,26,76,48],[39,54,24,14,55,25],[22,45,15,41,46,16],[6,151,121,14,152,122],[6,75,47,34,76,48],[46,54,24,10,55,25],[2,45,15,64,46,16],[17,152,122,4,153,123],[29,74,46,14,75,47],[49,54,24,10,55,25],[24,45,15,46,46,16],[4,152,122,18,153,123],[13,74,46,32,75,47],[48,54,24,14,55,25],[42,45,15,32,46,16],[20,147,117,4,148,118],[40,75,47,7,76,48],[43,54,24,22,55,25],[10,45,15,67,46,16],[19,148,118,6,149,119],[18,75,47,31,76,48],[34,54,24,34,55,25],[20,45,15,61,46,16]];j.getRSBlocks=function(a,b){var c=j.getRsBlockTable(a,b);if(void 0==c)throw Error("bad rs block @ typeNumber:"+a+"/errorCorrectLevel:"+b);for(var d=c.length/3,e=[],f=0;f<d;f++)for(var g=c[3*f+0],h=c[3*f+1],i=c[3*f+2],k=0;k<g;k++)e.push(new j(h,i));return e};j.getRsBlockTable=function(a,b){switch(b){case d.L:return j.RS_BLOCK_TABLE[4*(a-1)+0];case d.M:return j.RS_BLOCK_TABLE[4*(a-1)+1];case d.Q:return j.RS_BLOCK_TABLE[4*(a-1)+2];case d.H:return j.RS_BLOCK_TABLE[4*(a-1)+3]}};k.prototype={get:function(a){return 1==(this.buffer[Math.floor(a/8)]>>>7-a%8&1)},put:function(a,b){for(var c=0;c<b;c++)this.putBit(1==(a>>>b-c-1&1))},getLengthInBits:function(){return this.length},putBit:function(a){var b=Math.floor(this.length/8);this.buffer.length<=b&&this.buffer.push(0);a&&(this.buffer[b]|=128>>>this.length%8);this.length++}};return b}();
+  <div id="message" class="message hidden"></div>
 
-  // Helper to draw QR to canvas
-  function drawQR(text, canvasId, size) {
-    var qr = new QRCode(4, 'L');
-    qr.addData(text);
-    qr.make();
-    var canvas = document.getElementById(canvasId);
-    var ctx = canvas.getContext('2d');
-    var moduleCount = qr.getModuleCount();
-    var cellSize = Math.floor(size / moduleCount);
-    canvas.width = cellSize * moduleCount;
-    canvas.height = cellSize * moduleCount;
-    ctx.fillStyle = '#fff';
-    ctx.fillRect(0, 0, canvas.width, canvas.height);
-    ctx.fillStyle = '#000';
-    for (var row = 0; row < moduleCount; row++) {
-      for (var col = 0; col < moduleCount; col++) {
-        if (qr.isDark(row, col)) {
-          ctx.fillRect(col * cellSize, row * cellSize, cellSize, cellSize);
-        }
+  <div class="card">
+    <h3 style="margin-top:0;">Connect to Your WiFi</h3>
+    <p style="font-size:13px;color:#888;margin-bottom:15px;">Enter your WiFi network name and password:</p>
+    <input type="text" id="ssid-input" placeholder="WiFi Network Name">
+    <input type="password" id="password-input" placeholder="WiFi Password">
+    <button id="connect-btn" onclick="doConnect()">Connect to WiFi</button>
+  </div>
+</div>
+
+<script>
+var deviceId = 'unknown';
+var hostname = 'beautifi-device';
+
+window.onload = function() {
+  loadInfo();
+};
+
+function loadInfo() {
+  fetch('/api/system/status')
+    .then(function(r) { return r.json(); })
+    .then(function(data) {
+      if (data.device_id) {
+        deviceId = data.device_id;
+        document.getElementById('device-id').textContent = deviceId;
       }
-    }
+      if (data.hostname) {
+        hostname = data.hostname;
+      }
+    })
+    .catch(function() {});
+
+  fetch('/api/wifi/status')
+    .then(function(r) { return r.json(); })
+    .then(function(data) {
+      if (data.hostname) hostname = data.hostname;
+      var statusEl = document.getElementById('conn-status');
+      if (data.ap_active) {
+        statusEl.textContent = 'Setup Mode';
+        statusEl.style.color = '#00d4ff';
+      }
+    })
+    .catch(function() {});
+}
+
+function showOverlay(ssid) {
+  var url = 'http://' + hostname + '.local:5000/dashboard';
+  document.getElementById('overlay-url').textContent = url;
+  document.getElementById('overlay-device-id').textContent = deviceId;
+  document.getElementById('overlay-ssid').textContent = ssid;
+  document.getElementById('overlay-ssid2').textContent = ssid;
+  document.getElementById('success-overlay').classList.remove('hidden');
+}
+
+function doConnect() {
+  var ssid = document.getElementById('ssid-input').value;
+  var pw = document.getElementById('password-input').value;
+
+  if (!ssid || !pw) {
+    document.getElementById('message').textContent = 'Please enter network name and password';
+    document.getElementById('message').classList.remove('hidden');
+    return;
   }
-  </script>
 
-  <script>
-    let deviceId = '';
-    let hostname = 'beautifi-device';
+  var btn = document.getElementById('connect-btn');
+  btn.disabled = true;
+  btn.textContent = 'Connecting...';
+  document.getElementById('message').classList.add('hidden');
 
-    window.onload = function() {
-      checkStatus();
-      fetchDeviceInfo();
-    };
+  // Show overlay IMMEDIATELY
+  showOverlay(ssid);
 
-    async function fetchDeviceInfo() {
-      try {
-        const resp = await fetch('/api/system/status');
-        const data = await resp.json();
-        if (data.device_id) {
-          deviceId = data.device_id;
-          document.getElementById('device-id').textContent = deviceId;
-        }
-        if (data.hostname) {
-          hostname = data.hostname;
-        }
-      } catch (e) {
-        console.error('Failed to fetch device info:', e);
-      }
-    }
-
-    function showMessage(text, type) {
-      const msg = document.getElementById('message');
-      msg.textContent = text;
-      msg.className = 'message ' + type;
-      msg.classList.remove('hidden');
-    }
-
-    function hideMessage() {
-      document.getElementById('message').classList.add('hidden');
-    }
-
-    async function checkStatus() {
-      try {
-        const resp = await fetch('/api/wifi/status');
-        const data = await resp.json();
-
-        if (data.hostname) {
-          hostname = data.hostname;
-        }
-
-        const statusEl = document.getElementById('conn-status');
-
-        if (data.connected) {
-          statusEl.textContent = 'Connected';
-          statusEl.className = 'status-value connected';
-          // Show already connected card
-          const url = 'http://' + hostname + '.local:5000/dashboard';
-          document.getElementById('connected-url').textContent = url;
-          document.getElementById('already-connected').classList.remove('hidden');
-        } else if (data.ap_active) {
-          statusEl.textContent = 'Setup Mode';
-          statusEl.className = 'status-value';
-        } else {
-          statusEl.textContent = 'Disconnected';
-          statusEl.className = 'status-value disconnected';
-        }
-      } catch (e) {
-        console.error('Status check failed:', e);
-      }
-    }
-
-    function showSuccessOverlay(ssid) {
-      const dashboardUrl = 'http://' + hostname + '.local:5000/dashboard';
-
-      // Update overlay content
-      document.getElementById('success-url').textContent = dashboardUrl;
-      document.getElementById('success-device-id').textContent = deviceId || 'Unknown';
-      document.getElementById('success-network').textContent = ssid;
-      document.getElementById('network-name-reminder').textContent = ssid;
-
-      // Generate QR code
-      drawQR(dashboardUrl, 'qr-code', 180);
-
-      // Show overlay
-      document.getElementById('success-overlay').classList.remove('hidden');
-
-      // Start countdown
-      let seconds = 15;
-      const countdownEl = document.getElementById('countdown-seconds');
-      const interval = setInterval(() => {
-        seconds--;
-        countdownEl.textContent = seconds;
-        if (seconds <= 0) {
-          clearInterval(interval);
-          document.getElementById('countdown').textContent = 'Hotspot has closed. Connect to ' + ssid + ' to continue.';
-        }
-      }, 1000);
-    }
-
-    async function connectWifi() {
-      const ssid = document.getElementById('ssid-input').value;
-      const password = document.getElementById('password-input').value;
-
-      if (!ssid || !password) {
-        showMessage('Please enter network name and password', 'error');
-        return;
-      }
-
-      const btn = document.getElementById('connect-btn');
-      btn.disabled = true;
-      btn.innerHTML = '<span class="spinner"></span> Connecting...';
-      hideMessage();
-
-      // Show success overlay IMMEDIATELY - don't wait for response
-      // This guarantees user sees it before any connection issues
-      showSuccessOverlay(ssid);
-
-      // Send connect request in background (we don't wait for it)
-      fetch('/api/wifi/connect', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ ssid, password })
-      }).catch(() => {});  // Ignore errors - overlay already shown
-    }
-  </script>
+  // Send request (don't wait for response)
+  fetch('/api/wifi/connect', {
+    method: 'POST',
+    headers: {'Content-Type': 'application/json'},
+    body: JSON.stringify({ssid: ssid, password: pw})
+  }).catch(function() {});
+}
+</script>
 </body>
 </html>
