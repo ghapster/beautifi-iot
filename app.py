@@ -705,12 +705,85 @@ def get_fan_table():
 @app.route('/api/system/status', methods=['GET'])
 def system_status():
     """Get overall system status including update info."""
+    import socket
     return jsonify({
         "device_id": DEVICE_ID,
+        "hostname": socket.gethostname(),
         "firmware_version": FIRMWARE_VERSION,
         "simulation_mode": SIMULATION_MODE,
         "update_status": update_manager.get_status(),
         "config_status": config_manager.get_status(),
+    })
+
+
+@app.route('/api/network/discover', methods=['GET'])
+def discover_devices():
+    """Discover other BeautiFi devices on the local network using mDNS."""
+    import subprocess
+    import socket
+
+    devices = []
+    my_hostname = socket.gethostname()
+
+    try:
+        # Use avahi-browse to find _beautifi._tcp services
+        result = subprocess.run(
+            ['avahi-browse', '-t', '-r', '-p', '_beautifi._tcp'],
+            capture_output=True, text=True, timeout=10
+        )
+
+        # Parse avahi-browse output
+        # Format: +;interface;protocol;name;type;domain
+        # Then: =;interface;protocol;name;type;domain;hostname;address;port;txt
+        for line in result.stdout.split('\n'):
+            if line.startswith('='):
+                parts = line.split(';')
+                if len(parts) >= 9:
+                    hostname = parts[6].replace('.local', '')
+                    ip = parts[7]
+                    port = parts[8]
+
+                    # Don't include self
+                    if hostname != my_hostname:
+                        devices.append({
+                            'hostname': hostname,
+                            'ip': ip,
+                            'port': port,
+                            'url': f'http://{ip}:{port}',
+                            'dashboard': f'http://{ip}:{port}/dashboard',
+                            'is_self': False
+                        })
+
+        # Add self to the list
+        my_ip = None
+        try:
+            s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+            s.connect(('8.8.8.8', 80))
+            my_ip = s.getsockname()[0]
+            s.close()
+        except:
+            pass
+
+        devices.insert(0, {
+            'hostname': my_hostname,
+            'ip': my_ip or 'unknown',
+            'port': '5000',
+            'url': f'http://{my_ip}:5000' if my_ip else None,
+            'dashboard': f'http://{my_ip}:5000/dashboard' if my_ip else None,
+            'is_self': True
+        })
+
+    except subprocess.TimeoutExpired:
+        pass
+    except FileNotFoundError:
+        # avahi-browse not installed
+        pass
+    except Exception as e:
+        print(f"[DISCOVER] Error: {e}")
+
+    return jsonify({
+        'devices': devices,
+        'count': len(devices)
     })
 
 

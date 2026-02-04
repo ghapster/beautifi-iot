@@ -84,6 +84,13 @@ echo "hostapd and dnsmasq configured for AP mode"
 # Enable mDNS (avahi) for easy access via hostname.local
 sudo systemctl enable avahi-daemon 2>/dev/null || true
 sudo systemctl start avahi-daemon 2>/dev/null || true
+
+# Install avahi service file for device discovery
+if [ -f "$INSTALL_DIR/avahi/beautifi.service" ]; then
+    sudo cp "$INSTALL_DIR/avahi/beautifi.service" /etc/avahi/services/
+    sudo systemctl restart avahi-daemon
+    echo "BeautiFi mDNS service installed for network discovery"
+fi
 echo "mDNS enabled - device accessible via $(hostname).local"
 
 # Step 4: Python virtual environment

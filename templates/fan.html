@@ -3,75 +3,274 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>SalonSafe Fan Control</title>
+  <title>BeautiFi Fan Control</title>
   <style>
+    * { box-sizing: border-box; }
     body {
-      font-family: sans-serif;
-      text-align: center;
-      background: #f0faf9;
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      background: linear-gradient(135deg, #1a1a2e 0%, #16213e 100%);
+      color: #fff;
       margin: 0;
-      padding: 2rem;
+      padding: 20px;
+      min-height: 100vh;
     }
-    h1 {
-      color: #008080;
+    .container { max-width: 600px; margin: 0 auto; }
+    h1 { text-align: center; color: #00d4ff; margin-bottom: 5px; }
+    .subtitle { text-align: center; color: #888; margin-bottom: 30px; }
+    .card {
+      background: rgba(255,255,255,0.1);
+      border-radius: 12px;
+      padding: 20px;
+      margin-bottom: 20px;
     }
+    .card h2 { margin-top: 0; color: #00d4ff; font-size: 18px; }
+    .device-info {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 10px;
+      font-size: 14px;
+    }
+    .device-info .label { color: #888; }
+    .device-info .value { color: #0f0; font-family: monospace; }
     .buttons {
       display: flex;
       justify-content: center;
-      gap: 1rem;
-      margin-top: 2rem;
+      gap: 15px;
+      margin: 20px 0;
       flex-wrap: wrap;
     }
     button {
-      font-size: 1.2rem;
-      padding: 1rem 2rem;
+      font-size: 16px;
+      padding: 15px 30px;
       border: none;
       border-radius: 8px;
       color: white;
       cursor: pointer;
       min-width: 100px;
+      transition: transform 0.1s;
     }
+    button:hover { transform: scale(1.05); }
+    button:active { transform: scale(0.95); }
     .off { background: #e74c3c; }
-    .medium { background: #f1c40f; }
-    .high { background: #2ecc71; }
-    #status {
-      margin-top: 2rem;
-      font-size: 1rem;
-      color: #333;
+    .medium { background: #f39c12; }
+    .high { background: #27ae60; }
+    .status {
+      text-align: center;
+      padding: 10px;
+      border-radius: 8px;
+      margin-top: 10px;
+      font-size: 14px;
+    }
+    .status.success { background: rgba(0,255,136,0.2); color: #0f8; }
+    .status.error { background: rgba(255,107,107,0.2); color: #f66; }
+
+    /* Network Devices */
+    .device-list { margin-top: 15px; }
+    .device-item {
+      background: rgba(255,255,255,0.05);
+      border-radius: 8px;
+      padding: 15px;
+      margin-bottom: 10px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      flex-wrap: wrap;
+      gap: 10px;
+    }
+    .device-item.self {
+      border: 1px solid #00d4ff;
+      background: rgba(0,212,255,0.1);
+    }
+    .device-name {
+      font-weight: bold;
+      color: #fff;
+    }
+    .device-ip {
+      font-family: monospace;
+      color: #888;
+      font-size: 13px;
+    }
+    .device-controls {
+      display: flex;
+      gap: 8px;
+    }
+    .device-controls button {
+      padding: 8px 15px;
+      font-size: 13px;
+      min-width: auto;
+    }
+    .device-status {
+      width: 100%;
+      font-size: 12px;
+      color: #888;
+      margin-top: 5px;
+    }
+    .refresh-btn {
+      background: rgba(255,255,255,0.1);
+      color: #fff;
+      padding: 10px 20px;
+      font-size: 14px;
+    }
+    .refresh-btn:hover { background: rgba(255,255,255,0.2); }
+    .loading { color: #888; text-align: center; padding: 20px; }
+    .tag {
+      background: #00d4ff;
+      color: #000;
+      padding: 2px 8px;
+      border-radius: 4px;
+      font-size: 11px;
+      margin-left: 8px;
     }
   </style>
 </head>
 <body>
-  <h1>SalonSafe Fan Control</h1>
-  <div class="buttons">
-    <button class="off" onclick="setSpeed(0)">Off</button>
-    <button class="medium" onclick="setSpeed(50)">50%</button>
-    <button class="high" onclick="setSpeed(100)">100%</button>
+  <div class="container">
+    <h1>BeautiFi Control</h1>
+    <p class="subtitle">Air Quality Monitor</p>
+
+    <!-- This Device -->
+    <div class="card">
+      <h2>This Device</h2>
+      <div class="device-info">
+        <span class="label">Hostname:</span>
+        <span class="value" id="hostname">Loading...</span>
+        <span class="label">Device ID:</span>
+        <span class="value" id="device-id">Loading...</span>
+        <span class="label">IP Address:</span>
+        <span class="value" id="ip-address">Loading...</span>
+      </div>
+      <div class="buttons">
+        <button class="off" onclick="setSpeed(0)">Off</button>
+        <button class="medium" onclick="setSpeed(50)">50%</button>
+        <button class="high" onclick="setSpeed(100)">100%</button>
+      </div>
+      <div id="status" class="status" style="display:none;"></div>
+    </div>
+
+    <!-- Network Devices -->
+    <div class="card">
+      <h2>Network Devices <button class="refresh-btn" onclick="discoverDevices()">Refresh</button></h2>
+      <div id="device-list" class="device-list">
+        <div class="loading">Scanning network...</div>
+      </div>
+    </div>
   </div>
-  <div id="status"></div>
 
   <script>
-    async function setSpeed(speed) {
+    // Load device info on page load
+    window.onload = function() {
+      loadDeviceInfo();
+      discoverDevices();
+    };
+
+    async function loadDeviceInfo() {
+      try {
+        const resp = await fetch('/api/system/status');
+        const data = await resp.json();
+        document.getElementById('hostname').textContent = data.hostname || 'Unknown';
+        document.getElementById('device-id').textContent = data.device_id || 'Unknown';
+
+        // Get IP from discover endpoint (includes self)
+        const discResp = await fetch('/api/network/discover');
+        const discData = await discResp.json();
+        const self = discData.devices.find(d => d.is_self);
+        if (self) {
+          document.getElementById('ip-address').textContent = self.ip;
+        }
+      } catch (e) {
+        console.error('Failed to load device info:', e);
+      }
+    }
+
+    async function setSpeed(speed, targetUrl = '') {
+      const url = targetUrl ? `${targetUrl}/api/fan` : '/api/fan';
       const statusDiv = document.getElementById('status');
-      statusDiv.textContent = `Sending ${speed}%...`;
+      statusDiv.style.display = 'block';
+      statusDiv.className = 'status';
+      statusDiv.textContent = `Setting fan to ${speed}%...`;
 
       try {
-        const response = await fetch('/api/fan', {
+        const response = await fetch(url, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ speed })
         });
 
-        if (!response.ok) {
-          const err = await response.text();
-          throw new Error(err || 'Failed to send fan speed');
+        if (!response.ok) throw new Error('Failed');
+
+        statusDiv.className = 'status success';
+        statusDiv.textContent = `Fan set to ${speed}%`;
+      } catch (error) {
+        statusDiv.className = 'status error';
+        statusDiv.textContent = 'Failed to send command';
+      }
+    }
+
+    async function setSpeedOnDevice(ip, port, speed) {
+      const url = `http://${ip}:${port}`;
+      const statusEl = document.getElementById(`status-${ip}`);
+      if (statusEl) {
+        statusEl.textContent = `Setting to ${speed}%...`;
+        statusEl.style.color = '#888';
+      }
+
+      try {
+        const response = await fetch(`${url}/api/fan`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ speed })
+        });
+
+        if (!response.ok) throw new Error('Failed');
+
+        if (statusEl) {
+          statusEl.textContent = `Fan set to ${speed}%`;
+          statusEl.style.color = '#0f8';
+        }
+      } catch (error) {
+        if (statusEl) {
+          statusEl.textContent = 'Failed to connect';
+          statusEl.style.color = '#f66';
+        }
+      }
+    }
+
+    async function discoverDevices() {
+      const listEl = document.getElementById('device-list');
+      listEl.innerHTML = '<div class="loading">Scanning network...</div>';
+
+      try {
+        const resp = await fetch('/api/network/discover');
+        const data = await resp.json();
+
+        if (data.devices.length === 0) {
+          listEl.innerHTML = '<div class="loading">No devices found</div>';
+          return;
         }
 
-        const result = await response.json();
-        statusDiv.textContent = `✅ Fan set to ${speed}%`;
-      } catch (error) {
-        console.error(error);
-        statusDiv.textContent = '❌ Failed to send command';
+        listEl.innerHTML = data.devices.map(device => {
+          const selfTag = device.is_self ? '<span class="tag">THIS DEVICE</span>' : '';
+          const selfClass = device.is_self ? 'self' : '';
+
+          return `
+            <div class="device-item ${selfClass}">
+              <div>
+                <div class="device-name">${device.hostname}${selfTag}</div>
+                <div class="device-ip">${device.ip}:${device.port}</div>
+              </div>
+              <div class="device-controls">
+                <button class="off" onclick="setSpeedOnDevice('${device.ip}', '${device.port}', 0)">Off</button>
+                <button class="medium" onclick="setSpeedOnDevice('${device.ip}', '${device.port}', 50)">50%</button>
+                <button class="high" onclick="setSpeedOnDevice('${device.ip}', '${device.port}', 100)">100%</button>
+              </div>
+              <div class="device-status" id="status-${device.ip}"></div>
+            </div>
+          `;
+        }).join('');
+
+      } catch (e) {
+        listEl.innerHTML = '<div class="loading" style="color:#f66;">Failed to scan network</div>';
+        console.error('Discovery failed:', e);
       }
     }
   </script>
