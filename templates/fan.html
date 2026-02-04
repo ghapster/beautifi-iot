@@ -251,21 +251,34 @@
         listEl.innerHTML = data.devices.map(device => {
           const selfTag = device.is_self ? '<span class="tag">THIS DEVICE</span>' : '';
           const selfClass = device.is_self ? 'self' : '';
+          const backendTag = device.source === 'backend' ? '<span class="tag" style="background:#f39c12;">BACKEND</span>' : '';
+          const hasLocalAccess = device.ip && device.ip !== 'null' && device.ip !== 'unknown';
 
-          return `
-            <div class="device-item ${selfClass}">
-              <div>
-                <div class="device-name">${device.hostname}${selfTag}</div>
-                <div class="device-ip">${device.ip}:${device.port}</div>
-              </div>
-              <div class="device-controls">
-                <button class="off" onclick="setSpeedOnDevice('${device.ip}', '${device.port}', 0)">Off</button>
-                <button class="medium" onclick="setSpeedOnDevice('${device.ip}', '${device.port}', 50)">50%</button>
-                <button class="high" onclick="setSpeedOnDevice('${device.ip}', '${device.port}', 100)">100%</button>
-              </div>
-              <div class="device-status" id="status-${device.ip}"></div>
-            </div>
-          `;
+          // Display IP or "No local access" for backend-only devices
+          const ipDisplay = hasLocalAccess ? device.ip + ':' + device.port : 'No local IP (backend only)';
+
+          // Show controls only if we have local network access
+          let controls = '';
+          if (hasLocalAccess) {
+            controls = '<div class="device-controls">' +
+              '<button class="off" onclick="setSpeedOnDevice(\'' + device.ip + '\', \'' + device.port + '\', 0)">Off</button>' +
+              '<button class="medium" onclick="setSpeedOnDevice(\'' + device.ip + '\', \'' + device.port + '\', 50)">50%</button>' +
+              '<button class="high" onclick="setSpeedOnDevice(\'' + device.ip + '\', \'' + device.port + '\', 100)">100%</button>' +
+              '</div>';
+          } else {
+            controls = '<div class="device-controls"><span style="color:#888;font-size:12px;">Control via Miner Dashboard</span></div>';
+          }
+
+          const statusId = hasLocalAccess ? 'status-' + device.ip : 'status-' + (device.device_id || device.hostname);
+
+          return '<div class="device-item ' + selfClass + '">' +
+              '<div>' +
+                '<div class="device-name">' + device.hostname + selfTag + backendTag + '</div>' +
+                '<div class="device-ip">' + ipDisplay + '</div>' +
+              '</div>' +
+              controls +
+              '<div class="device-status" id="' + statusId + '"></div>' +
+            '</div>';
         }).join('');
 
       } catch (e) {
