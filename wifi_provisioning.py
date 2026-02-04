@@ -264,10 +264,7 @@ class WiFiProvisioning:
             print(f"[WIFI] Connected to {ssid}, IP: {ip}")
             return True, f"Connected to {ssid}. IP: {ip}"
         else:
-            # Connection failed - restart AP mode so user can try again
             print(f"[WIFI] Failed to connect: {output}")
-            print("[WIFI] Restarting AP mode for retry...")
-            self.start_ap_mode()
             return False, f"Failed to connect: {output}"
 
     def disconnect(self) -> Tuple[bool, str]:

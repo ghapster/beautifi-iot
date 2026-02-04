@@ -13,9 +13,20 @@
       padding: 20px;
       min-height: 100vh;
     }
-    .container { max-width: 400px; margin: 0 auto; }
-    h1 { text-align: center; margin-bottom: 10px; color: #00d4ff; }
-    .subtitle { text-align: center; color: #888; margin-bottom: 30px; }
+    .container {
+      max-width: 400px;
+      margin: 0 auto;
+    }
+    h1 {
+      text-align: center;
+      margin-bottom: 10px;
+      color: #00d4ff;
+    }
+    .subtitle {
+      text-align: center;
+      color: #888;
+      margin-bottom: 30px;
+    }
     .card {
       background: rgba(255,255,255,0.1);
       border-radius: 12px;
@@ -30,7 +41,48 @@
     }
     .status:last-child { border-bottom: none; }
     .status-label { color: #888; }
-    .status-value { font-weight: bold; color: #00d4ff; font-family: monospace; }
+    .status-value { font-weight: bold; }
+    .status-value.connected { color: #00ff88; }
+    .status-value.disconnected { color: #ff6b6b; }
+    .network-list {
+      max-height: 200px;
+      overflow-y: auto;
+      margin: 15px 0;
+    }
+    .network-item {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 12px;
+      background: rgba(255,255,255,0.05);
+      border-radius: 8px;
+      margin-bottom: 8px;
+      cursor: pointer;
+      transition: background 0.2s;
+    }
+    .network-item:hover {
+      background: rgba(255,255,255,0.15);
+    }
+    .network-item.selected {
+      background: rgba(0,212,255,0.2);
+      border: 1px solid #00d4ff;
+    }
+    .network-name { font-weight: bold; }
+    .network-signal {
+      font-size: 12px;
+      color: #888;
+    }
+    .signal-bars {
+      display: inline-flex;
+      gap: 2px;
+      margin-left: 10px;
+    }
+    .signal-bar {
+      width: 4px;
+      background: #444;
+      border-radius: 1px;
+    }
+    .signal-bar.active { background: #00ff88; }
     input[type="password"], input[type="text"] {
       width: 100%;
       padding: 12px;
@@ -52,213 +104,252 @@
       font-size: 16px;
       font-weight: bold;
       cursor: pointer;
+      transition: background 0.2s;
     }
-    button:disabled { background: #444; color: #888; }
+    button:hover { background: #00b8e6; }
+    button:disabled {
+      background: #444;
+      color: #888;
+      cursor: not-allowed;
+    }
+    button.secondary {
+      background: rgba(255,255,255,0.1);
+      color: #fff;
+      margin-top: 10px;
+    }
+    button.secondary:hover {
+      background: rgba(255,255,255,0.2);
+    }
     .message {
       padding: 12px;
       border-radius: 8px;
       margin-bottom: 15px;
       text-align: center;
-      background: rgba(255,107,107,0.2);
-      color: #ff6b6b;
     }
+    .message.success { background: rgba(0,255,136,0.2); color: #00ff88; }
+    .message.error { background: rgba(255,107,107,0.2); color: #ff6b6b; }
+    .message.info { background: rgba(0,212,255,0.2); color: #00d4ff; }
+    .spinner {
+      display: inline-block;
+      width: 20px;
+      height: 20px;
+      border: 2px solid rgba(255,255,255,0.3);
+      border-radius: 50%;
+      border-top-color: #00d4ff;
+      animation: spin 1s linear infinite;
+      margin-right: 10px;
+      vertical-align: middle;
+    }
+    @keyframes spin { to { transform: rotate(360deg); } }
     .hidden { display: none; }
-
-    /* SUCCESS OVERLAY */
-    #success-overlay {
-      position: fixed;
-      top: 0; left: 0; right: 0; bottom: 0;
-      background: #0a5d0a;
-      z-index: 9999;
-      padding: 20px;
-      text-align: center;
-      overflow-y: auto;
-    }
-    #success-overlay.hidden { display: none; }
-    .big-icon { font-size: 80px; margin: 20px 0; }
-    .big-title { font-size: 24px; font-weight: bold; color: #fff; margin-bottom: 20px; }
-    .screenshot-box {
-      background: #ff4444;
-      color: #fff;
-      padding: 15px;
-      border-radius: 8px;
-      font-size: 20px;
-      font-weight: bold;
-      margin: 20px 0;
-      animation: pulse 1s infinite;
-    }
-    @keyframes pulse { 50% { transform: scale(1.03); } }
-    .url-box {
-      background: #000;
-      color: #0f0;
-      padding: 20px;
-      border-radius: 8px;
-      font-family: monospace;
-      font-size: 16px;
-      margin: 20px 0;
-      word-break: break-all;
-    }
-    .info-box {
-      background: rgba(0,0,0,0.3);
-      padding: 15px;
-      border-radius: 8px;
-      margin: 15px 0;
-      text-align: left;
-    }
-    .info-row { display: flex; justify-content: space-between; margin: 8px 0; }
-    .info-label { color: #aaa; }
-    .info-val { color: #0ff; font-family: monospace; }
-    .instructions {
-      background: rgba(0,0,0,0.3);
-      padding: 15px;
-      border-radius: 8px;
-      text-align: left;
-      margin-top: 20px;
-    }
-    .instructions h4 { margin: 0 0 10px 0; color: #0f0; }
-    .instructions ol { margin: 0; padding-left: 20px; }
-    .instructions li { margin: 8px 0; }
-    .fail-section { margin-top: 15px; }
-    .fail-section h4 { color: #ff6b6b; }
   </style>
 </head>
 <body>
+  <div class="container">
+    <h1>BeautiFi Setup</h1>
+    <p class="subtitle">Connect your device to WiFi</p>
 
-<!-- SUCCESS OVERLAY -->
-<div id="success-overlay" class="hidden">
-  <div class="big-icon">⏳</div>
-  <div class="big-title">Connecting to WiFi...</div>
-
-  <div class="screenshot-box">📸 SCREENSHOT THIS PAGE NOW!</div>
-
-  <div style="color:#aaa;margin-bottom:10px;">Your Dashboard URL:</div>
-  <div class="url-box" id="overlay-url">http://beautifi-1.local:5000/dashboard</div>
-
-  <div class="info-box">
-    <div class="info-row">
-      <span class="info-label">Device ID:</span>
-      <span class="info-val" id="overlay-device-id">loading...</span>
+    <!-- Status Card -->
+    <div class="card">
+      <div class="status">
+        <span class="status-label">Status</span>
+        <span class="status-value" id="conn-status">Checking...</span>
+      </div>
+      <div class="status">
+        <span class="status-label">Network</span>
+        <span class="status-value" id="current-ssid">-</span>
+      </div>
+      <div class="status">
+        <span class="status-label">IP Address</span>
+        <span class="status-value" id="ip-address">-</span>
+      </div>
     </div>
-    <div class="info-row">
-      <span class="info-label">Connecting to:</span>
-      <span class="info-val" id="overlay-ssid">-</span>
+
+    <!-- Message Area -->
+    <div id="message" class="message hidden"></div>
+
+    <!-- WiFi Setup Card -->
+    <div class="card">
+      <h3>Available Networks</h3>
+      <div id="network-list" class="network-list">
+        <div style="text-align:center;color:#888;padding:20px;">
+          <span class="spinner"></span> Scanning...
+        </div>
+      </div>
+
+      <input type="text" id="ssid-input" placeholder="Network name (SSID)">
+      <input type="password" id="password-input" placeholder="Password">
+
+      <button id="connect-btn" onclick="connectWifi()">Connect</button>
+      <button class="secondary" onclick="scanNetworks()">Scan Again</button>
     </div>
-  </div>
 
-  <div class="instructions">
-    <h4>✅ If connection succeeds:</h4>
-    <ol>
-      <li>Connect your phone to <strong id="overlay-ssid2">your WiFi</strong></li>
-      <li>Open the URL shown above in your browser</li>
-      <li>Bookmark it for easy access!</li>
-    </ol>
-
-    <div class="fail-section">
-      <h4>❌ If connection fails (wrong password):</h4>
-      <ol>
-        <li>The <strong>BeautiFi-Setup</strong> hotspot will reappear</li>
-        <li>Reconnect to it and try again</li>
-      </ol>
-    </div>
-  </div>
-</div>
-
-<!-- MAIN PAGE -->
-<div class="container" id="main-page">
-  <h1>BeautiFi Setup</h1>
-  <p class="subtitle">Air Quality Monitor</p>
-
-  <div class="card">
-    <div class="status">
-      <span class="status-label">Device ID</span>
-      <span class="status-value" id="device-id">Loading...</span>
-    </div>
-    <div class="status">
-      <span class="status-label">Status</span>
-      <span class="status-value" id="conn-status" style="color:#888;">Checking...</span>
+    <!-- After Connected -->
+    <div id="next-steps" class="card hidden">
+      <h3>Next Steps</h3>
+      <p>Your device is now connected! You can:</p>
+      <button onclick="window.location.href='/dashboard'">Go to Dashboard</button>
+      <button class="secondary" onclick="window.location.href='/api/registration/status'">Check Registration</button>
     </div>
   </div>
 
-  <div id="message" class="message hidden"></div>
+  <script>
+    let selectedNetwork = null;
+    window.deviceHostname = 'beautifi-device'; // Default, updated by checkStatus
 
-  <div class="card">
-    <h3 style="margin-top:0;">Connect to Your WiFi</h3>
-    <p style="font-size:13px;color:#888;margin-bottom:15px;">Enter your WiFi network name and password:</p>
-    <input type="text" id="ssid-input" placeholder="WiFi Network Name">
-    <input type="password" id="password-input" placeholder="WiFi Password">
-    <button id="connect-btn" onclick="doConnect()">Connect to WiFi</button>
-  </div>
-</div>
+    // Check status on load
+    window.onload = function() {
+      checkStatus();
+      scanNetworks();
+    };
 
-<script>
-var deviceId = 'unknown';
-var hostname = 'beautifi-device';
+    function showMessage(text, type) {
+      const msg = document.getElementById('message');
+      msg.textContent = text;
+      msg.className = 'message ' + type;
+      msg.classList.remove('hidden');
+    }
 
-window.onload = function() {
-  loadInfo();
-};
+    function hideMessage() {
+      document.getElementById('message').classList.add('hidden');
+    }
 
-function loadInfo() {
-  fetch('/api/system/status')
-    .then(function(r) { return r.json(); })
-    .then(function(data) {
-      if (data.device_id) {
-        deviceId = data.device_id;
-        document.getElementById('device-id').textContent = deviceId;
+    async function checkStatus() {
+      try {
+        const resp = await fetch('/api/wifi/status');
+        const data = await resp.json();
+
+        // Store hostname for later use
+        if (data.hostname) {
+          window.deviceHostname = data.hostname;
+        }
+
+        const statusEl = document.getElementById('conn-status');
+        const ssidEl = document.getElementById('current-ssid');
+        const ipEl = document.getElementById('ip-address');
+
+        if (data.connected) {
+          statusEl.textContent = 'Connected';
+          statusEl.className = 'status-value connected';
+          ssidEl.textContent = data.current_ssid || '-';
+          ipEl.textContent = data.ip_address || '-';
+          document.getElementById('next-steps').classList.remove('hidden');
+        } else if (data.ap_active) {
+          statusEl.textContent = 'AP Mode';
+          statusEl.className = 'status-value';
+          ssidEl.textContent = data.ap_ssid + ' (Hotspot)';
+          ipEl.textContent = '192.168.4.1';
+        } else {
+          statusEl.textContent = 'Disconnected';
+          statusEl.className = 'status-value disconnected';
+          ssidEl.textContent = '-';
+          ipEl.textContent = '-';
+        }
+      } catch (e) {
+        console.error('Status check failed:', e);
       }
-      if (data.hostname) {
-        hostname = data.hostname;
+    }
+
+    async function scanNetworks() {
+      const listEl = document.getElementById('network-list');
+      listEl.innerHTML = '<div style="text-align:center;color:#888;padding:20px;"><span class="spinner"></span> Scanning...</div>';
+
+      try {
+        const resp = await fetch('/api/wifi/scan');
+        const data = await resp.json();
+
+        if (data.networks && data.networks.length > 0) {
+          listEl.innerHTML = data.networks.map(net => {
+            const signal = parseInt(net.signal) || 0;
+            const bars = [
+              signal > 20 ? 'active' : '',
+              signal > 40 ? 'active' : '',
+              signal > 60 ? 'active' : '',
+              signal > 80 ? 'active' : ''
+            ];
+            return `
+              <div class="network-item" onclick="selectNetwork('${net.ssid}')">
+                <div>
+                  <div class="network-name">${net.ssid}</div>
+                  <div class="network-signal">${net.security || 'Open'}</div>
+                </div>
+                <div class="signal-bars">
+                  <div class="signal-bar ${bars[0]}" style="height:6px"></div>
+                  <div class="signal-bar ${bars[1]}" style="height:10px"></div>
+                  <div class="signal-bar ${bars[2]}" style="height:14px"></div>
+                  <div class="signal-bar ${bars[3]}" style="height:18px"></div>
+                </div>
+              </div>
+            `;
+          }).join('');
+        } else {
+          listEl.innerHTML = '<div style="text-align:center;color:#888;padding:20px;">No networks found</div>';
+        }
+      } catch (e) {
+        listEl.innerHTML = '<div style="text-align:center;color:#ff6b6b;padding:20px;">Scan failed</div>';
       }
-    })
-    .catch(function() {});
+    }
 
-  fetch('/api/wifi/status')
-    .then(function(r) { return r.json(); })
-    .then(function(data) {
-      if (data.hostname) hostname = data.hostname;
-      var statusEl = document.getElementById('conn-status');
-      if (data.ap_active) {
-        statusEl.textContent = 'Setup Mode';
-        statusEl.style.color = '#00d4ff';
+    function selectNetwork(ssid) {
+      selectedNetwork = ssid;
+      document.getElementById('ssid-input').value = ssid;
+      document.getElementById('password-input').focus();
+
+      // Update selection UI
+      document.querySelectorAll('.network-item').forEach(el => {
+        el.classList.remove('selected');
+        if (el.querySelector('.network-name').textContent === ssid) {
+          el.classList.add('selected');
+        }
+      });
+    }
+
+    async function connectWifi() {
+      const ssid = document.getElementById('ssid-input').value;
+      const password = document.getElementById('password-input').value;
+
+      if (!ssid || !password) {
+        showMessage('Please enter network name and password', 'error');
+        return;
       }
-    })
-    .catch(function() {});
-}
 
-function showOverlay(ssid) {
-  var url = 'http://' + hostname + '.local:5000/dashboard';
-  document.getElementById('overlay-url').textContent = url;
-  document.getElementById('overlay-device-id').textContent = deviceId;
-  document.getElementById('overlay-ssid').textContent = ssid;
-  document.getElementById('overlay-ssid2').textContent = ssid;
-  document.getElementById('success-overlay').classList.remove('hidden');
-}
+      const btn = document.getElementById('connect-btn');
+      btn.disabled = true;
+      btn.innerHTML = '<span class="spinner"></span> Connecting...';
+      hideMessage();
 
-function doConnect() {
-  var ssid = document.getElementById('ssid-input').value;
-  var pw = document.getElementById('password-input').value;
+      try {
+        const resp = await fetch('/api/wifi/connect', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ ssid, password })
+        });
 
-  if (!ssid || !pw) {
-    document.getElementById('message').textContent = 'Please enter network name and password';
-    document.getElementById('message').classList.remove('hidden');
-    return;
-  }
+        const data = await resp.json();
 
-  var btn = document.getElementById('connect-btn');
-  btn.disabled = true;
-  btn.textContent = 'Connecting...';
-  document.getElementById('message').classList.add('hidden');
-
-  // Show overlay IMMEDIATELY
-  showOverlay(ssid);
-
-  // Send request (don't wait for response)
-  fetch('/api/wifi/connect', {
-    method: 'POST',
-    headers: {'Content-Type': 'application/json'},
-    body: JSON.stringify({ssid: ssid, password: pw})
-  }).catch(function() {});
-}
-</script>
+        if (data.success) {
+          if (data.connecting) {
+            // Device is switching networks - we'll lose connection
+            const hostname = data.hostname || 'your-device';
+            showMessage('Connecting to ' + ssid + '... The hotspot will shut down. Access your device at: http://' + hostname + '.local:5000', 'info');
+            btn.textContent = 'Connecting...';
+            // Don't re-enable button - page will become unresponsive
+            return;
+          }
+          showMessage('Connected successfully!', 'success');
+          setTimeout(checkStatus, 2000);
+        } else {
+          showMessage(data.message || 'Connection failed', 'error');
+        }
+        btn.disabled = false;
+        btn.textContent = 'Connect';
+      } catch (e) {
+        // This is expected when AP mode stops - the connection drops
+        showMessage('Device is connecting. The hotspot has stopped. Access your device at: http://' + window.deviceHostname + '.local:5000', 'info');
+        btn.textContent = 'Connecting...';
+        // Don't re-enable - page is unresponsive anyway
+      }
+    }
+  </script>
 </body>
 </html>

@@ -139,35 +139,6 @@ def index():
     return render_template('index.html')
 
 
-# ============================================
-# Captive Portal Detection
-# ============================================
-# These endpoints trigger the "Sign in to network" popup on devices
-
-@app.route('/generate_204')  # Android
-@app.route('/gen_204')  # Android alternate
-def captive_android():
-    """Android captive portal detection."""
-    return redirect('/')
-
-@app.route('/hotspot-detect.html')  # Apple iOS/macOS
-@app.route('/library/test/success.html')  # Apple alternate
-def captive_apple():
-    """Apple captive portal detection."""
-    return redirect('/')
-
-@app.route('/connecttest.txt')  # Windows
-@app.route('/ncsi.txt')  # Windows alternate
-def captive_windows():
-    """Windows captive portal detection."""
-    return redirect('/')
-
-@app.route('/canonical.html')  # Firefox
-def captive_firefox():
-    """Firefox captive portal detection."""
-    return redirect('/')
-
-
 @app.route('/dashboard')
 def dashboard():
     """Fan control dashboard."""
@@ -383,14 +354,10 @@ def wifi_connect():
 
     # Start connection attempt in background thread AFTER responding
     # This prevents the "load failed" error when AP mode stops
-    # 3-second delay gives time for HTTP response to complete
     import threading
     def delayed_connect():
-        time.sleep(3)  # Brief delay for response to send
-        print(f"[WIFI] Starting connection to {ssid}...")
+        time.sleep(2)  # Wait for response to be sent
         wifi_provisioner.connect_to_wifi(ssid, password)
-
-    print(f"[WIFI] Scheduling connection to {ssid} in 3 seconds...")
 
     threading.Thread(target=delayed_connect, daemon=True).start()
 
@@ -738,10 +705,8 @@ def get_fan_table():
 @app.route('/api/system/status', methods=['GET'])
 def system_status():
     """Get overall system status including update info."""
-    import socket
     return jsonify({
         "device_id": DEVICE_ID,
-        "hostname": socket.gethostname(),
         "firmware_version": FIRMWARE_VERSION,
         "simulation_mode": SIMULATION_MODE,
         "update_status": update_manager.get_status(),
