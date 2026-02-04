@@ -171,6 +171,47 @@ The Device ID is displayed:
 
 Format: `btfi-` followed by 16 hex characters (e.g., `btfi-9c5263e883ee1b97`)
 
+## OTA Updates (Over-The-Air)
+
+Devices automatically check for and install firmware updates, even when deployed at remote locations.
+
+### Automatic Updates
+- Devices check for updates **every 6 hours**
+- First check occurs **5 minutes after boot**
+- Updates are downloaded, verified, and installed automatically
+- Service restarts after successful update
+
+### Backend-Triggered Updates
+The backend can send update commands to specific devices:
+
+| Command | Value | Action |
+|---------|-------|--------|
+| `check_update` | - | Check for available updates |
+| `perform_update` | - | Download and install update |
+
+### Publishing a New Release
+
+1. Create `releases/latest.json` manifest:
+```json
+{
+  "version": "1.2.0",
+  "release_date": "2026-02-04",
+  "download_url": "https://github.com/ghapster/beautifi-iot/releases/download/v1.2.0/firmware.zip",
+  "file_hash": "<sha256>",
+  "file_size": 12345,
+  "changelog": "Bug fixes",
+  "min_version": "1.0.0"
+}
+```
+
+2. Create firmware ZIP and upload to GitHub Releases
+3. Devices will auto-update within 6 hours (or trigger via backend command)
+
+### Update Safety
+- **Backup created** before each update
+- **Rollback available** if update fails
+- **Signature verification** (optional, for production)
+
 ## Remote Fan Control
 
 The device polls the backend every 10 seconds for commands:

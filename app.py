@@ -1006,6 +1006,12 @@ class CommandPoller:
             elif cmd_type == 'set_speed':
                 # Direct speed control (0-100)
                 success = self._handle_fan_command(cmd_value)
+            elif cmd_type == 'check_update':
+                # Check for OTA updates
+                success = self._handle_check_update()
+            elif cmd_type == 'perform_update':
+                # Download and install OTA update
+                success = self._handle_perform_update()
             else:
                 error = f"Unknown command: {cmd_type}"
                 print(f"[CMD] {error}")
@@ -1044,6 +1050,20 @@ class CommandPoller:
         print(f"[CMD] Fans set to {target_speed}%")
         return True
 
+    def _handle_check_update(self):
+        """Check for OTA updates."""
+        print("[CMD] Checking for OTA updates...")
+        available, manifest, message = update_manager.check_for_updates()
+        print(f"[CMD] Update check: {message}")
+        return True
+
+    def _handle_perform_update(self):
+        """Download and install OTA update."""
+        print("[CMD] Performing OTA update...")
+        success, message = update_manager.perform_update(auto_backup=True, auto_restart=True)
+        print(f"[CMD] Update result: {message}")
+        return success
+
     def _ack_command(self, cmd_id, success, error=None):
         """Acknowledge command execution to backend."""
         try:
@@ -1060,6 +1080,82 @@ class CommandPoller:
 
 # Initialize command poller
 command_poller = CommandPoller(DEVICE_ID, BACKEND_URL, poll_interval=10)
+
+
+# ============================================
+# Automatic OTA Update Scheduler
+# ============================================
+
+class OTAScheduler:
+    """Periodically checks for and applies OTA updates."""
+
+    def __init__(self, update_manager, check_interval_hours=6, auto_install=True):
+        """
+        Initialize OTA scheduler.
+
+        Args:
+            update_manager: UpdateManager instance
+            check_interval_hours: Hours between update checks (default: 6)
+            auto_install: Automatically install updates if available
+        """
+        self.update_manager = update_manager
+        self.check_interval = check_interval_hours * 3600  # Convert to seconds
+        self.auto_install = auto_install
+        self._running = False
+        self._thread = None
+
+    def start(self):
+        """Start automatic update checking."""
+        if self._running:
+            return
+        self._running = True
+        self._thread = threading.Thread(target=self._check_loop, daemon=True)
+        self._thread.start()
+        print(f"[OTA] Auto-update scheduler started (checking every {self.check_interval // 3600} hours)")
+
+    def stop(self):
+        """Stop automatic update checking."""
+        self._running = False
+        if self._thread:
+            self._thread.join(timeout=5)
+        print("[OTA] Auto-update scheduler stopped")
+
+    def _check_loop(self):
+        """Main update check loop."""
+        # Wait 5 minutes after boot before first check
+        initial_delay = 300
+        time.sleep(initial_delay)
+
+        while self._running:
+            try:
+                self._perform_update_check()
+            except Exception as e:
+                print(f"[OTA] Scheduler error: {e}")
+
+            # Sleep in smaller intervals to allow graceful shutdown
+            for _ in range(int(self.check_interval / 60)):
+                if not self._running:
+                    break
+                time.sleep(60)
+
+    def _perform_update_check(self):
+        """Check for updates and optionally install."""
+        print("[OTA] Scheduled update check...")
+
+        available, manifest, message = self.update_manager.check_for_updates()
+        print(f"[OTA] {message}")
+
+        if available and self.auto_install:
+            print(f"[OTA] Update available: {manifest.version}. Installing...")
+            success, msg = self.update_manager.perform_update(
+                auto_backup=True,
+                auto_restart=True
+            )
+            print(f"[OTA] Update result: {msg}")
+
+
+# Initialize OTA scheduler (checks every 6 hours, auto-installs updates)
+ota_scheduler = OTAScheduler(update_manager, check_interval_hours=6, auto_install=True)
 
 
 # ============================================
@@ -1085,6 +1181,9 @@ if __name__ == '__main__':
 
     # Start command polling for remote fan control
     command_poller.start()
+
+    # Start OTA auto-update scheduler
+    ota_scheduler.start()
 
     # Run Flask server
     app.run(host='0.0.0.0', port=5000, debug=False)
