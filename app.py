@@ -1087,22 +1087,23 @@ command_poller = CommandPoller(DEVICE_ID, BACKEND_URL, poll_interval=10)
 # ============================================
 
 class OTAScheduler:
-    """Periodically checks for and applies OTA updates."""
+    """Periodically checks for and applies OTA updates during maintenance window."""
 
-    def __init__(self, update_manager, check_interval_hours=6, auto_install=True):
+    def __init__(self, update_manager, maintenance_hour=3, auto_install=True):
         """
         Initialize OTA scheduler.
 
         Args:
             update_manager: UpdateManager instance
-            check_interval_hours: Hours between update checks (default: 6)
+            maintenance_hour: Hour to perform updates (0-23, default: 3 AM)
             auto_install: Automatically install updates if available
         """
         self.update_manager = update_manager
-        self.check_interval = check_interval_hours * 3600  # Convert to seconds
+        self.maintenance_hour = maintenance_hour
         self.auto_install = auto_install
         self._running = False
         self._thread = None
+        self._pending_update = None  # Stores manifest if update is available
 
     def start(self):
         """Start automatic update checking."""
@@ -1111,7 +1112,7 @@ class OTAScheduler:
         self._running = True
         self._thread = threading.Thread(target=self._check_loop, daemon=True)
         self._thread.start()
-        print(f"[OTA] Auto-update scheduler started (checking every {self.check_interval // 3600} hours)")
+        print(f"[OTA] Auto-update scheduler started (installs at {self.maintenance_hour}:00 AM)")
 
     def stop(self):
         """Stop automatic update checking."""
@@ -1122,40 +1123,63 @@ class OTAScheduler:
 
     def _check_loop(self):
         """Main update check loop."""
+        from datetime import datetime
+
         # Wait 5 minutes after boot before first check
-        initial_delay = 300
-        time.sleep(initial_delay)
+        time.sleep(300)
 
         while self._running:
             try:
-                self._perform_update_check()
+                current_hour = datetime.now().hour
+
+                # Check for updates every 6 hours (just to know if one is available)
+                if self._pending_update is None:
+                    self._check_for_updates()
+
+                # Only install during maintenance window (3 AM - 4 AM)
+                if self._pending_update and current_hour == self.maintenance_hour:
+                    print(f"[OTA] Maintenance window ({self.maintenance_hour}:00). Installing update...")
+                    self._install_pending_update()
+
             except Exception as e:
                 print(f"[OTA] Scheduler error: {e}")
 
-            # Sleep in smaller intervals to allow graceful shutdown
-            for _ in range(int(self.check_interval / 60)):
+            # Check every 30 minutes
+            for _ in range(30):
                 if not self._running:
                     break
                 time.sleep(60)
 
-    def _perform_update_check(self):
-        """Check for updates and optionally install."""
-        print("[OTA] Scheduled update check...")
-
+    def _check_for_updates(self):
+        """Check if update is available."""
+        print("[OTA] Checking for updates...")
         available, manifest, message = self.update_manager.check_for_updates()
         print(f"[OTA] {message}")
 
-        if available and self.auto_install:
-            print(f"[OTA] Update available: {manifest.version}. Installing...")
-            success, msg = self.update_manager.perform_update(
-                auto_backup=True,
-                auto_restart=True
-            )
-            print(f"[OTA] Update result: {msg}")
+        if available:
+            self._pending_update = manifest
+            print(f"[OTA] Update {manifest.version} queued for {self.maintenance_hour}:00 AM")
+
+    def _install_pending_update(self):
+        """Install the pending update."""
+        if not self._pending_update or not self.auto_install:
+            return
+
+        manifest = self._pending_update
+        print(f"[OTA] Installing update: {manifest.version}")
+
+        success, msg = self.update_manager.perform_update(
+            auto_backup=True,
+            auto_restart=True
+        )
+        print(f"[OTA] Update result: {msg}")
+
+        if success:
+            self._pending_update = None
 
 
-# Initialize OTA scheduler (checks every 6 hours, auto-installs updates)
-ota_scheduler = OTAScheduler(update_manager, check_interval_hours=6, auto_install=True)
+# Initialize OTA scheduler (installs updates at 3 AM)
+ota_scheduler = OTAScheduler(update_manager, maintenance_hour=3, auto_install=True)
 
 
 # ============================================

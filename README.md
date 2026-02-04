@@ -176,10 +176,10 @@ Format: `btfi-` followed by 16 hex characters (e.g., `btfi-9c5263e883ee1b97`)
 Devices automatically check for and install firmware updates, even when deployed at remote locations.
 
 ### Automatic Updates
-- Devices check for updates **every 6 hours**
-- First check occurs **5 minutes after boot**
-- Updates are downloaded, verified, and installed automatically
-- Service restarts after successful update
+- Devices check for updates **every 30 minutes**
+- Updates are **only installed at 3:00 AM** (maintenance window)
+- This prevents fan/ventilation interruption during business hours
+- Service restarts after successful update (~5-10 seconds downtime)
 
 ### Backend-Triggered Updates
 The backend can send update commands to specific devices:
