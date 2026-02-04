@@ -118,6 +118,46 @@ Edit `config.py`:
 - `SAMPLE_INTERVAL_SECONDS = 12` - Telemetry sampling rate
 - `EPOCH_DURATION_MINUTES = 60` - Epoch length
 
+## User Registration & Token Rewards
+
+When deploying a device to a new location, users must register to earn SLN token rewards.
+
+### Registration Flow
+
+```
+1. SETUP DEVICE
+   └─ Power on IoT device
+   └─ Connect to "BeautiFi-Setup" hotspot
+   └─ Configure WiFi at http://192.168.4.1:5000
+   └─ Note the Device ID (e.g., btfi-9c5263e883ee1b97)
+
+2. REGISTER ONLINE
+   └─ Go to registration portal
+   └─ Connect crypto wallet (MetaMask, etc.)
+   └─ Fill in salon details
+   └─ Enter Device ID from step 1  ← Links device to wallet
+   └─ Submit registration
+
+3. ADMIN APPROVAL
+   └─ Admin reviews registration
+   └─ Approves and mints Site NFT
+   └─ Device automatically linked to wallet
+
+4. START EARNING
+   └─ Device submits telemetry to backend
+   └─ Epochs verified every hour
+   └─ SLN tokens credited to registered wallet
+```
+
+### Finding Your Device ID
+
+The Device ID is displayed:
+- On the device dashboard at `http://<device-ip>:5000/dashboard`
+- In the API response: `GET /api/system/status`
+- In device logs: `sudo journalctl -u beautifi-iot | grep CRYPTO`
+
+Format: `btfi-` followed by 16 hex characters (e.g., `btfi-9c5263e883ee1b97`)
+
 ## Remote Fan Control
 
 The device polls the backend every 10 seconds for commands:
@@ -167,4 +207,4 @@ All prototype devices have:
 
 See `CLAUDE.md` for detailed architecture, wiring diagrams, and implementation notes.
 
-*Last Updated: February 4, 2026 (All 4 devices fully operational)*
+*Last Updated: February 4, 2026*
