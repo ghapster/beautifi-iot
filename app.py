@@ -1087,23 +1087,31 @@ command_poller = CommandPoller(DEVICE_ID, BACKEND_URL, poll_interval=10)
 # ============================================
 
 class OTAScheduler:
-    """Periodically checks for and applies OTA updates during maintenance window."""
+    """
+    Smart OTA update scheduler.
 
-    def __init__(self, update_manager, maintenance_hour=3, auto_install=True):
+    Installs updates when:
+    1. Fans have been OFF (0%) for 5+ minutes (salon likely closed)
+    2. On boot if an update was pending
+    """
+
+    # How long fans must be at 0% before installing update (seconds)
+    FANS_OFF_THRESHOLD = 300  # 5 minutes
+
+    def __init__(self, update_manager, auto_install=True):
         """
         Initialize OTA scheduler.
 
         Args:
             update_manager: UpdateManager instance
-            maintenance_hour: Hour to perform updates (0-23, default: 3 AM)
-            auto_install: Automatically install updates if available
+            auto_install: Automatically install updates when safe
         """
         self.update_manager = update_manager
-        self.maintenance_hour = maintenance_hour
         self.auto_install = auto_install
         self._running = False
         self._thread = None
-        self._pending_update = None  # Stores manifest if update is available
+        self._pending_update = None
+        self._fans_off_since = None  # Timestamp when fans went to 0%
 
     def start(self):
         """Start automatic update checking."""
@@ -1112,43 +1120,52 @@ class OTAScheduler:
         self._running = True
         self._thread = threading.Thread(target=self._check_loop, daemon=True)
         self._thread.start()
-        print(f"[OTA] Auto-update scheduler started (installs at {self.maintenance_hour}:00 AM)")
+        print("[OTA] Smart update scheduler started (installs when fans are OFF)")
 
     def stop(self):
         """Stop automatic update checking."""
         self._running = False
         if self._thread:
             self._thread.join(timeout=5)
-        print("[OTA] Auto-update scheduler stopped")
+        print("[OTA] Update scheduler stopped")
+
+    def check_pending_on_boot(self):
+        """Check for and install pending updates on boot (before fans start)."""
+        print("[OTA] Checking for pending updates on boot...")
+        available, manifest, message = self.update_manager.check_for_updates()
+
+        if available:
+            print(f"[OTA] Update available on boot: {manifest.version}. Installing now...")
+            success, msg = self.update_manager.perform_update(
+                auto_backup=True,
+                auto_restart=True
+            )
+            print(f"[OTA] Boot update result: {msg}")
+            return success
+        else:
+            print(f"[OTA] {message}")
+            return False
 
     def _check_loop(self):
         """Main update check loop."""
-        from datetime import datetime
-
-        # Wait 5 minutes after boot before first check
-        time.sleep(300)
+        # Wait 2 minutes after boot before starting checks
+        time.sleep(120)
 
         while self._running:
             try:
-                current_hour = datetime.now().hour
-
-                # Check for updates every 6 hours (just to know if one is available)
+                # Check for updates every 30 minutes
                 if self._pending_update is None:
                     self._check_for_updates()
 
-                # Only install during maintenance window (3 AM - 4 AM)
-                if self._pending_update and current_hour == self.maintenance_hour:
-                    print(f"[OTA] Maintenance window ({self.maintenance_hour}:00). Installing update...")
-                    self._install_pending_update()
+                # Check if fans are off and we can install
+                if self._pending_update:
+                    self._check_fans_and_install()
 
             except Exception as e:
                 print(f"[OTA] Scheduler error: {e}")
 
-            # Check every 30 minutes
-            for _ in range(30):
-                if not self._running:
-                    break
-                time.sleep(60)
+            # Check every minute
+            time.sleep(60)
 
     def _check_for_updates(self):
         """Check if update is available."""
@@ -1158,7 +1175,27 @@ class OTAScheduler:
 
         if available:
             self._pending_update = manifest
-            print(f"[OTA] Update {manifest.version} queued for {self.maintenance_hour}:00 AM")
+            print(f"[OTA] Update {manifest.version} queued - will install when fans are OFF")
+
+    def _check_fans_and_install(self):
+        """Check if fans are off long enough to safely install update."""
+        # Check current fan speeds
+        all_fans_off = all(speed == 0 for speed in current_speeds.values())
+
+        if all_fans_off:
+            if self._fans_off_since is None:
+                self._fans_off_since = time.time()
+                print("[OTA] Fans are OFF, starting countdown...")
+            else:
+                off_duration = time.time() - self._fans_off_since
+                if off_duration >= self.FANS_OFF_THRESHOLD:
+                    print(f"[OTA] Fans OFF for {int(off_duration)}s. Safe to install update.")
+                    self._install_pending_update()
+        else:
+            # Fans are running, reset countdown
+            if self._fans_off_since is not None:
+                print("[OTA] Fans turned ON, update postponed")
+            self._fans_off_since = None
 
     def _install_pending_update(self):
         """Install the pending update."""
@@ -1176,10 +1213,11 @@ class OTAScheduler:
 
         if success:
             self._pending_update = None
+            self._fans_off_since = None
 
 
-# Initialize OTA scheduler (installs updates at 3 AM)
-ota_scheduler = OTAScheduler(update_manager, maintenance_hour=3, auto_install=True)
+# Initialize OTA scheduler (installs when fans are OFF)
+ota_scheduler = OTAScheduler(update_manager, auto_install=True)
 
 
 # ============================================
@@ -1195,6 +1233,10 @@ if __name__ == '__main__':
     print(f"  Running on Pi: {RUNNING_ON_PI}")
     print(f"  Verifier: {VERIFIER_URL if ENABLE_VERIFIER_SYNC else 'DISABLED'}")
     print("=" * 60)
+
+    # Check for pending OTA updates BEFORE starting fans
+    # This ensures updates install on boot if device was off during previous update window
+    ota_scheduler.check_pending_on_boot()
 
     # Start verifier background sync
     if verifier_client:

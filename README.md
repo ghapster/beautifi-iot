@@ -177,8 +177,9 @@ Devices automatically check for and install firmware updates, even when deployed
 
 ### Automatic Updates
 - Devices check for updates **every 30 minutes**
-- Updates are **only installed at 3:00 AM** (maintenance window)
-- This prevents fan/ventilation interruption during business hours
+- Updates are installed when **fans have been OFF for 5+ minutes** (salon likely closed)
+- If device was powered off, updates install **on next boot** before fans start
+- This prevents ventilation interruption during business hours
 - Service restarts after successful update (~5-10 seconds downtime)
 
 ### Backend-Triggered Updates
