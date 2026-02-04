@@ -223,6 +223,55 @@ The device polls the backend every 10 seconds for commands:
 | `fan` | `off` | Set all fans to 0% |
 | `set_speed` | `0-100` | Set specific percentage |
 
+## Multi-Device Discovery & Control
+
+The fan dashboard (`/dashboard`) can discover and control multiple BeautiFi devices on the network.
+
+### Discovery Methods
+
+| Method | How It Works | Limitation |
+|--------|--------------|------------|
+| **Local (self)** | Always shows the device you're connected to | None |
+| **mDNS** | Uses Avahi to find `_beautifi._tcp` services | Blocked by WiFi client isolation |
+| **Backend** | Queries `/api/devices/online/all` for devices reporting telemetry | Requires internet, no local IP |
+
+### Dashboard Features
+
+- **THIS DEVICE** tag: Identifies the device you're directly connected to
+- **BACKEND** tag: Devices discovered via backend (control via Miner Dashboard)
+- Fan speed controls: Off / 50% / 100% for devices with local network access
+- Auto-refresh: Click "Refresh" to rescan the network
+
+### API Endpoint
+
+```
+GET /api/network/discover
+```
+
+Returns all discoverable devices:
+```json
+{
+  "devices": [
+    {
+      "hostname": "beautifi-1",
+      "device_id": "btfi-e8a6eb4a363fe54e",
+      "ip": "192.168.0.151",
+      "port": "5000",
+      "is_self": true,
+      "source": "local"
+    },
+    {
+      "hostname": "beautifi-2",
+      "device_id": "btfi-9c5263e883ee1b97",
+      "ip": null,
+      "port": "5000",
+      "is_self": false,
+      "source": "backend"
+    }
+  ]
+}
+```
+
 ## Prototype Devices (Feb 2026)
 
 | Device | Hostname | Device ID | Status |
@@ -262,4 +311,4 @@ All prototype devices have:
 
 See `CLAUDE.md` for detailed architecture, wiring diagrams, and implementation notes.
 
-*Last Updated: February 4, 2026*
+*Last Updated: February 4, 2026 (Multi-device discovery)*
