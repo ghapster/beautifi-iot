@@ -735,6 +735,7 @@ def discover_devices():
         # Parse avahi-browse output
         # Format: +;interface;protocol;name;type;domain
         # Then: =;interface;protocol;name;type;domain;hostname;address;port;txt
+        seen_hosts = set()
         for line in result.stdout.split('\n'):
             if line.startswith('='):
                 parts = line.split(';')
@@ -743,16 +744,23 @@ def discover_devices():
                     ip = parts[7]
                     port = parts[8]
 
-                    # Don't include self
-                    if hostname != my_hostname:
-                        devices.append({
-                            'hostname': hostname,
-                            'ip': ip,
-                            'port': port,
-                            'url': f'http://{ip}:{port}',
-                            'dashboard': f'http://{ip}:{port}/dashboard',
-                            'is_self': False
-                        })
+                    # Skip IPv6 addresses (start with fe80 or contain :)
+                    if ':' in ip:
+                        continue
+
+                    # Skip duplicates and self
+                    if hostname in seen_hosts or hostname == my_hostname:
+                        continue
+                    seen_hosts.add(hostname)
+
+                    devices.append({
+                        'hostname': hostname,
+                        'ip': ip,
+                        'port': port,
+                        'url': f'http://{ip}:{port}',
+                        'dashboard': f'http://{ip}:{port}/dashboard',
+                        'is_self': False
+                    })
 
         # Add self to the list
         my_ip = None
