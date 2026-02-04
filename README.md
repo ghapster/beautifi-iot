@@ -54,6 +54,19 @@ If no WiFi is pre-configured, the device automatically enters AP mode on boot:
 
 > **Note:** The WiFi provisioning UI is functional but needs polish. Network scanning is not available while in AP mode. This is a known limitation - manual SSID entry works correctly.
 
+### 4. Access Your Device (mDNS)
+
+After WiFi setup, access your device using its hostname - no IP lookup needed:
+
+```
+http://beautifi-1.local:5000/dashboard
+http://beautifi-2.local:5000/dashboard
+http://beautifi-3.local:5000/dashboard
+http://beautifi-4.local:5000/dashboard
+```
+
+The `.local` address works on most home networks via mDNS/Bonjour.
+
 ## Features
 
 - **Fan Control**: PWM control for up to 3 fans via GPIO

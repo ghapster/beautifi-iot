@@ -40,7 +40,7 @@ fi
 # Step 1: System dependencies
 echo -e "${GREEN}[1/8] Updating system and installing dependencies...${NC}"
 sudo apt-get update
-sudo apt-get install -y git python3-pip python3-venv python3-dev libffi-dev build-essential hostapd dnsmasq
+sudo apt-get install -y git python3-pip python3-venv python3-dev libffi-dev build-essential hostapd dnsmasq avahi-daemon
 
 # Step 2: Clone repository
 echo ""
@@ -80,6 +80,11 @@ sudo systemctl stop dnsmasq 2>/dev/null || true
 sudo systemctl unmask hostapd 2>/dev/null || true
 
 echo "hostapd and dnsmasq configured for AP mode"
+
+# Enable mDNS (avahi) for easy access via hostname.local
+sudo systemctl enable avahi-daemon 2>/dev/null || true
+sudo systemctl start avahi-daemon 2>/dev/null || true
+echo "mDNS enabled - device accessible via $(hostname).local"
 
 # Step 4: Python virtual environment
 echo ""
@@ -179,7 +184,8 @@ echo "  Hostname:    $(hostname)"
 echo "  IP Address:  $IP_ADDR"
 echo "  Status:      $STATUS"
 echo ""
-echo "  Dashboard:   http://$IP_ADDR:5000/dashboard"
+echo "  Dashboard:   http://$(hostname).local:5000/dashboard"
+echo "               http://$IP_ADDR:5000/dashboard"
 echo ""
 echo "----------------------------------------"
 echo "Useful Commands:"

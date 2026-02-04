@@ -327,6 +327,7 @@ class WiFiProvisioning:
 
     def get_status(self) -> Dict:
         """Get current WiFi status."""
+        import socket
         return {
             "connected": self.is_connected(),
             "current_ssid": self.get_current_ssid(),
@@ -334,6 +335,7 @@ class WiFiProvisioning:
             "ap_active": self.is_ap_active(),
             "ap_ssid": self.ap_ssid,
             "interface": self._interface,
+            "hostname": socket.gethostname(),
         }
 
 

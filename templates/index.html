@@ -195,6 +195,7 @@
 
   <script>
     let selectedNetwork = null;
+    window.deviceHostname = 'beautifi-device'; // Default, updated by checkStatus
 
     // Check status on load
     window.onload = function() {
@@ -217,6 +218,11 @@
       try {
         const resp = await fetch('/api/wifi/status');
         const data = await resp.json();
+
+        // Store hostname for later use
+        if (data.hostname) {
+          window.deviceHostname = data.hostname;
+        }
 
         const statusEl = document.getElementById('conn-status');
         const ssidEl = document.getElementById('current-ssid');
@@ -324,7 +330,8 @@
         if (data.success) {
           if (data.connecting) {
             // Device is switching networks - we'll lose connection
-            showMessage('Connecting to ' + ssid + '... This page will become unresponsive as the hotspot shuts down. Find your device on your main network or check your router.', 'info');
+            const hostname = data.hostname || 'your-device';
+            showMessage('Connecting to ' + ssid + '... The hotspot will shut down. Access your device at: http://' + hostname + '.local:5000', 'info');
             btn.textContent = 'Connecting...';
             // Don't re-enable button - page will become unresponsive
             return;
@@ -338,7 +345,7 @@
         btn.textContent = 'Connect';
       } catch (e) {
         // This is expected when AP mode stops - the connection drops
-        showMessage('Device is attempting to connect. The hotspot has stopped. Look for your device on your main WiFi network.', 'info');
+        showMessage('Device is connecting. The hotspot has stopped. Access your device at: http://' + window.deviceHostname + '.local:5000', 'info');
         btn.textContent = 'Connecting...';
         // Don't re-enable - page is unresponsive anyway
       }

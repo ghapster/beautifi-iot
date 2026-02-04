@@ -362,10 +362,12 @@ def wifi_connect():
     threading.Thread(target=delayed_connect, daemon=True).start()
 
     # Respond immediately before AP stops
+    import socket
     return jsonify({
         'success': True,
-        'message': f'Connecting to {ssid}... The hotspot will disconnect. Check your router for the device.',
-        'connecting': True
+        'message': f'Connecting to {ssid}... The hotspot will disconnect.',
+        'connecting': True,
+        'hostname': socket.gethostname()
     })
 
 
