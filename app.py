@@ -718,23 +718,46 @@ def system_status():
 
 @app.route('/api/network/discover', methods=['GET'])
 def discover_devices():
-    """Discover other BeautiFi devices on the local network using mDNS."""
+    """Discover BeautiFi devices via mDNS (local) and backend (remote)."""
     import subprocess
     import socket
+    import requests
 
     devices = []
     my_hostname = socket.gethostname()
+    seen_device_ids = set()
 
+    # Get my IP
+    my_ip = None
     try:
-        # Use avahi-browse to find _beautifi._tcp services
+        s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+        s.connect(('8.8.8.8', 80))
+        my_ip = s.getsockname()[0]
+        s.close()
+    except:
+        pass
+
+    # Add self first
+    devices.append({
+        'hostname': my_hostname,
+        'device_id': DEVICE_ID,
+        'ip': my_ip or 'unknown',
+        'port': '5000',
+        'url': f'http://{my_ip}:5000' if my_ip else None,
+        'dashboard': f'http://{my_ip}:5000/dashboard' if my_ip else None,
+        'is_self': True,
+        'source': 'local',
+        'is_registered': False
+    })
+    seen_device_ids.add(DEVICE_ID)
+
+    # Try mDNS discovery (works on local network without client isolation)
+    try:
         result = subprocess.run(
             ['avahi-browse', '-t', '-r', '-p', '_beautifi._tcp'],
-            capture_output=True, text=True, timeout=10
+            capture_output=True, text=True, timeout=5
         )
 
-        # Parse avahi-browse output
-        # Format: +;interface;protocol;name;type;domain
-        # Then: =;interface;protocol;name;type;domain;hostname;address;port;txt
         seen_hosts = set()
         for line in result.stdout.split('\n'):
             if line.startswith('='):
@@ -744,50 +767,53 @@ def discover_devices():
                     ip = parts[7]
                     port = parts[8]
 
-                    # Skip IPv6 addresses (start with fe80 or contain :)
-                    if ':' in ip:
-                        continue
-
-                    # Skip duplicates and self
-                    if hostname in seen_hosts or hostname == my_hostname:
+                    # Skip IPv6 and duplicates
+                    if ':' in ip or hostname in seen_hosts or hostname == my_hostname:
                         continue
                     seen_hosts.add(hostname)
 
                     devices.append({
                         'hostname': hostname,
+                        'device_id': None,
                         'ip': ip,
                         'port': port,
                         'url': f'http://{ip}:{port}',
                         'dashboard': f'http://{ip}:{port}/dashboard',
-                        'is_self': False
+                        'is_self': False,
+                        'source': 'mdns',
+                        'is_registered': None
                     })
-
-        # Add self to the list
-        my_ip = None
-        try:
-            s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
-            s.connect(('8.8.8.8', 80))
-            my_ip = s.getsockname()[0]
-            s.close()
-        except:
-            pass
-
-        devices.insert(0, {
-            'hostname': my_hostname,
-            'ip': my_ip or 'unknown',
-            'port': '5000',
-            'url': f'http://{my_ip}:5000' if my_ip else None,
-            'dashboard': f'http://{my_ip}:5000/dashboard' if my_ip else None,
-            'is_self': True
-        })
-
-    except subprocess.TimeoutExpired:
+    except:
         pass
-    except FileNotFoundError:
-        # avahi-browse not installed
-        pass
+
+    # Query backend for all online devices (works across networks)
+    try:
+        resp = requests.get(
+            'https://salon-safe-backend.onrender.com/api/devices/online/all',
+            params={'minutes': 60},
+            timeout=10
+        )
+        if resp.status_code == 200:
+            data = resp.json()
+            for dev in data.get('devices', []):
+                device_id = dev.get('device_id')
+                if device_id and device_id not in seen_device_ids:
+                    seen_device_ids.add(device_id)
+                    devices.append({
+                        'hostname': dev.get('salon_name') or device_id,
+                        'device_id': device_id,
+                        'ip': None,  # Backend doesn't know local IP
+                        'port': '5000',
+                        'url': None,
+                        'dashboard': None,
+                        'is_self': False,
+                        'source': 'backend',
+                        'is_registered': dev.get('is_registered', False),
+                        'salon_name': dev.get('salon_name'),
+                        'location': dev.get('location')
+                    })
     except Exception as e:
-        print(f"[DISCOVER] Error: {e}")
+        print(f"[DISCOVER] Backend query failed: {e}")
 
     return jsonify({
         'devices': devices,
