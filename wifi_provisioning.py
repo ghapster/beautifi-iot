@@ -260,8 +260,17 @@ class WiFiProvisioning:
         if success:
             # Wait for connection to establish
             time.sleep(3)
+            # Set hostname in the connection so router shows device name
+            import socket
+            hostname = socket.gethostname()
+            self._run_shell(f'sudo nmcli connection modify "{ssid}" ipv4.dhcp-hostname "{hostname}"')
+            # Reconnect to apply hostname
+            self._run_shell(f'sudo nmcli connection down "{ssid}"')
+            time.sleep(1)
+            self._run_shell(f'sudo nmcli connection up "{ssid}"')
+            time.sleep(2)
             ip = self.get_ip_address()
-            print(f"[WIFI] Connected to {ssid}, IP: {ip}")
+            print(f"[WIFI] Connected to {ssid}, IP: {ip}, Hostname: {hostname}")
             return True, f"Connected to {ssid}. IP: {ip}"
         else:
             print(f"[WIFI] Failed to connect: {output}")
