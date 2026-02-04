@@ -147,10 +147,26 @@
 <body>
   <div class="container">
     <h1>BeautiFi Setup</h1>
-    <p class="subtitle">Connect your device to WiFi</p>
+    <p class="subtitle">Air Quality Monitor Setup</p>
 
-    <!-- Status Card -->
+    <!-- Setup Instructions -->
+    <div class="card" style="background: rgba(0,212,255,0.15); border: 1px solid #00d4ff;">
+      <h3 style="margin-top:0; color:#00d4ff;">Setup Instructions</h3>
+      <div style="font-size: 14px; line-height: 1.6;">
+        <p><strong>Step 1:</strong> Connect to your WiFi network below</p>
+        <p><strong>Step 2:</strong> Note your <strong>Device ID</strong> (needed for registration)</p>
+        <p><strong>Step 3:</strong> After WiFi connects, access your dashboard at:<br>
+          <code id="dashboard-url" style="background:#000;padding:4px 8px;border-radius:4px;display:inline-block;margin-top:5px;">http://[hostname].local:5000/dashboard</code>
+        </p>
+      </div>
+    </div>
+
+    <!-- Device Info Card -->
     <div class="card">
+      <div class="status">
+        <span class="status-label">Device ID</span>
+        <span class="status-value" id="device-id" style="color:#00d4ff;font-family:monospace;">Loading...</span>
+      </div>
       <div class="status">
         <span class="status-label">Status</span>
         <span class="status-value" id="conn-status">Checking...</span>
@@ -163,6 +179,7 @@
         <span class="status-label">IP Address</span>
         <span class="status-value" id="ip-address">-</span>
       </div>
+      <p style="font-size:12px;color:#888;margin:10px 0 0 0;">Save your Device ID - you'll need it when registering at the rewards portal.</p>
     </div>
 
     <!-- Message Area -->
@@ -170,7 +187,8 @@
 
     <!-- WiFi Setup Card -->
     <div class="card">
-      <h3>Available Networks</h3>
+      <h3>Connect to WiFi</h3>
+      <p style="font-size:13px;color:#888;margin-bottom:15px;">Enter your WiFi network name and password below:</p>
       <div id="network-list" class="network-list">
         <div style="text-align:center;color:#888;padding:20px;">
           <span class="spinner"></span> Scanning...
@@ -185,11 +203,14 @@
     </div>
 
     <!-- After Connected -->
-    <div id="next-steps" class="card hidden">
-      <h3>Next Steps</h3>
-      <p>Your device is now connected! You can:</p>
-      <button onclick="window.location.href='/dashboard'">Go to Dashboard</button>
-      <button class="secondary" onclick="window.location.href='/api/registration/status'">Check Registration</button>
+    <div id="next-steps" class="card hidden" style="background: rgba(0,255,136,0.15); border: 1px solid #00ff88;">
+      <h3 style="margin-top:0; color:#00ff88;">WiFi Connected!</h3>
+      <p style="font-size:14px;">Your device is now on the network. Next steps:</p>
+      <ol style="font-size:13px;padding-left:20px;margin:10px 0;">
+        <li>Access your fan controls at:<br><strong id="connected-url">http://[hostname].local:5000/dashboard</strong></li>
+        <li>Register your device at the rewards portal using Device ID above</li>
+      </ol>
+      <button onclick="window.location.href='/dashboard'">Open Fan Controls</button>
     </div>
   </div>
 
@@ -201,7 +222,25 @@
     window.onload = function() {
       checkStatus();
       scanNetworks();
+      fetchDeviceInfo();
     };
+
+    async function fetchDeviceInfo() {
+      try {
+        const resp = await fetch('/api/system/status');
+        const data = await resp.json();
+        if (data.device_id) {
+          document.getElementById('device-id').textContent = data.device_id;
+        }
+        if (data.hostname || window.deviceHostname) {
+          const hostname = data.hostname || window.deviceHostname;
+          document.getElementById('dashboard-url').textContent = 'http://' + hostname + '.local:5000/dashboard';
+          document.getElementById('connected-url').textContent = 'http://' + hostname + '.local:5000/dashboard';
+        }
+      } catch (e) {
+        console.error('Failed to fetch device info:', e);
+      }
+    }
 
     function showMessage(text, type) {
       const msg = document.getElementById('message');
