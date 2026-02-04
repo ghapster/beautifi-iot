@@ -383,9 +383,10 @@ def wifi_connect():
 
     # Start connection attempt in background thread AFTER responding
     # This prevents the "load failed" error when AP mode stops
+    # 15-second delay gives user time to screenshot the success overlay with QR code
     import threading
     def delayed_connect():
-        time.sleep(2)  # Wait for response to be sent
+        time.sleep(15)  # Wait for user to screenshot success overlay
         wifi_provisioner.connect_to_wifi(ssid, password)
 
     threading.Thread(target=delayed_connect, daemon=True).start()
