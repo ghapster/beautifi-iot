@@ -132,21 +132,24 @@ The device polls the backend every 10 seconds for commands:
 
 | Device | Hostname | Device ID | Status |
 |--------|----------|-----------|--------|
-| IoT #1 | beautifi-1 | (original) | ✅ Production reference unit |
+| IoT #1 | beautifi-1 | btfi-e8a6eb4a363fe54e | ✅ Fully operational |
 | IoT #2 | beautifi-2 | btfi-9c5263e883ee1b97 | ✅ Fully operational |
 | IoT #3 | beautifi-3 | btfi-5e93d18822a826b3 | ✅ Fully operational |
 | IoT #4 | beautifi-4 | btfi-49311ccf334d9d45 | ✅ Fully operational |
 
 All prototype devices have:
 - Latest code from GitHub
-- WiFi AP mode provisioning configured (hostapd/dnsmasq)
+- WiFi AP mode provisioning configured and tested (hostapd/dnsmasq)
 - Fan control working via PWM
+- Service files configured to run as root (required for AP mode)
 
 ### Hardware Troubleshooting Notes
 
 **SN74AHCT125 Orientation**: The SN74 logic buffer chip must be oriented correctly with pin 1 (marked by dot/notch) in the correct position. A 180° rotation will cause the chip to overheat and become damaged. If the SN74 gets hot, check orientation immediately and replace with a fresh chip.
 
 **USB-C Breakout Boards**: Use identical breakout boards across all units. Different manufacturers may have different pin labeling. Reference IoT #1 wiring: Pin 1 (GND/B1) and Pin 6 (A8/B6).
+
+**Service File Fix**: If WiFi hotspot doesn't appear on boot, check `/etc/systemd/system/beautifi-wifi.service` - it must NOT have `User=pi` line (needs to run as root to start hostapd). Fix with: `sudo sed -i '/User=pi/d' /etc/systemd/system/beautifi-wifi.service && sudo systemctl daemon-reload`
 
 ## Known Issues / TODO
 
@@ -164,4 +167,4 @@ All prototype devices have:
 
 See `CLAUDE.md` for detailed architecture, wiring diagrams, and implementation notes.
 
-*Last Updated: February 3, 2026 (All prototypes operational)*
+*Last Updated: February 4, 2026 (All 4 devices fully operational)*
