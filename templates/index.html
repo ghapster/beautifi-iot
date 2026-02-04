@@ -214,10 +214,10 @@
 <body>
   <!-- Success Overlay (shown after clicking Connect) -->
   <div id="success-overlay" class="success-overlay hidden">
-    <div class="success-checkmark">✓</div>
-    <div class="success-title">WiFi Setup Complete!</div>
+    <div class="success-checkmark">⏳</div>
+    <div class="success-title">Connecting to WiFi...</div>
 
-    <div class="screenshot-banner">📸 SCREENSHOT THIS PAGE</div>
+    <div class="screenshot-banner">📸 SCREENSHOT THIS NOW</div>
 
     <div class="qr-container">
       <canvas id="qr-code"></canvas>
@@ -239,12 +239,16 @@
     <div class="countdown" id="countdown">Hotspot closing in <span id="countdown-seconds">15</span> seconds...</div>
 
     <div class="next-steps">
-      <h3>What to do next:</h3>
+      <h3>If connection SUCCEEDS:</h3>
       <ol>
-        <li><strong>Screenshot this page</strong> or write down the URL above</li>
-        <li>Connect your phone/laptop back to <strong id="network-name-reminder">your WiFi</strong></li>
+        <li>Connect your phone/laptop to <strong id="network-name-reminder">your WiFi</strong></li>
         <li>Open the URL above OR scan the QR code</li>
-        <li>You'll see your fan controls dashboard!</li>
+        <li>You'll see your fan controls!</li>
+      </ol>
+      <h3 style="margin-top:15px; color:#ff6b6b;">If connection FAILS:</h3>
+      <ol>
+        <li>The <strong>BeautiFi-Setup</strong> hotspot will reappear</li>
+        <li>Reconnect to it and try again with correct password</li>
       </ol>
     </div>
   </div>
