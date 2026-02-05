@@ -141,6 +141,20 @@ Pi GPIO (3.3V PWM) → SN74 Logic Buffer → PWM-to-0-10V Converter → Fan VSP 
 - Yellow wire = VSP (Variable Speed Potentiometer) input
 - PWM-to-0-10V modules convert Pi's PWM signal to analog
 
+### AC Infinity USB-C Control Cable Wiring
+The fan's USB-C control cable has 4 wires:
+
+| Wire | Purpose | Safe to Connect? |
+|------|---------|------------------|
+| **Yellow** | VSP (0-10V speed control input) | ✅ YES - connect to PWM-to-0-10V output via A8 pin |
+| **Black** | Ground | ✅ YES - connect to GND rail |
+| **White** | Tach (RPM feedback) | ❌ NO - leave floating (unused) |
+| **Red** | Power reference (~10V output) | ⚠️ **DANGER - NEVER CONNECT TO PI** |
+
+**WARNING - RED WIRE**: The red wire is a **power OUTPUT** from the fan's internal controller, intended for AC Infinity's proprietary controller. Connecting it to the Pi or any Pi-connected circuit will backfeed ~10V into the Pi and **destroy it**. (A Pi was damaged during early development before this was discovered.)
+
+**Safe Practice**: Only connect GND and A8 (yellow/VSP) from the USB-C breakout board to the breadboard. The red and white wires can remain physically connected inside the fan - as long as their corresponding pins on the USB-C breakout are left unconnected, they float harmlessly with no electrical path to the Pi.
+
 ### Detailed Wiring (3-Fan Setup)
 
 **FAN 1 (GPIO 18)**

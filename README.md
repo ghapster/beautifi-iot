@@ -293,6 +293,18 @@ All prototype devices have:
 
 **USB-C Breakout Boards**: Use identical breakout boards across all units. Different manufacturers may have different pin labeling. Reference IoT #1 wiring: Pin 1 (GND/B1) and Pin 6 (A8/B6).
 
+**AC Infinity Fan Wiring - RED WIRE WARNING**: AC Infinity fans have a USB-C control cable with 4 wires:
+| Wire | Purpose | Connect to Breadboard? |
+|------|---------|------------------------|
+| Yellow | VSP (0-10V speed control input) | **YES** - to PWM-to-0-10V output |
+| Black | Ground | **YES** - to GND rail |
+| White | Tach (RPM feedback) | NO - leave unconnected |
+| Red | Power reference (~10V output) | **NO - NEVER CONNECT** |
+
+The red wire is a **power OUTPUT** from the fan's internal controller (meant for AC Infinity's proprietary controller). Connecting it to the Pi or any Pi-connected circuit will backfeed voltage and **damage the Pi** (learned the hard way - destroyed a Pi during early development).
+
+**Safe configuration**: Only connect GND and A8 (yellow/VSP) pins from the USB-C breakout to your breadboard. The red and white wires can remain connected inside the fan - they simply float unconnected at the breakout board, which is electrically safe. No need to physically disconnect them inside the fan.
+
 **Service File Fix**: If WiFi hotspot doesn't appear on boot, check `/etc/systemd/system/beautifi-wifi.service` - it must NOT have `User=pi` line (needs to run as root to start hostapd). Fix with: `sudo sed -i '/User=pi/d' /etc/systemd/system/beautifi-wifi.service && sudo systemctl daemon-reload`
 
 ## Known Issues / TODO
