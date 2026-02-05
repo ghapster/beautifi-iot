@@ -23,7 +23,26 @@ SIMULATION_MODE = True
 # ============================================
 # DEVICE IDENTITY
 # ============================================
-DEVICE_ID = "btfi-iot-001"
+# Load device ID from identity file if it exists, otherwise use fallback
+def _load_device_id():
+    """Load device ID from cryptographic identity file."""
+    import json
+    identity_path = Path.home() / ".beautifi" / "keys" / "identity.json"
+    if identity_path.exists():
+        try:
+            with open(identity_path, 'r') as f:
+                identity = json.load(f)
+                device_id = identity.get("device_id")
+                if device_id:
+                    print(f"[CONFIG] Loaded device ID from identity: {device_id}")
+                    return device_id
+        except Exception as e:
+            print(f"[CONFIG] Failed to load identity: {e}")
+    # Fallback for devices without identity file
+    print("[CONFIG] Using fallback device ID: btfi-iot-001")
+    return "btfi-iot-001"
+
+DEVICE_ID = _load_device_id()
 SITE_ID = "site-test-001"
 FIRMWARE_VERSION = "0.2.0"
 
