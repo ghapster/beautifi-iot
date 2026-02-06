@@ -243,37 +243,30 @@
         const resp = await fetch('/api/network/discover');
         const data = await resp.json();
 
-        if (data.devices.length === 0) {
+        // Only show devices reachable on the local network
+        const localDevices = data.devices.filter(d => d.is_self || (d.ip && d.ip !== 'null' && d.ip !== 'unknown'));
+
+        if (localDevices.length === 0) {
           listEl.innerHTML = '<div class="loading">No devices found</div>';
           return;
         }
 
-        listEl.innerHTML = data.devices.map(device => {
+        listEl.innerHTML = localDevices.map(device => {
           const selfTag = device.is_self ? '<span class="tag">THIS DEVICE</span>' : '';
           const selfClass = device.is_self ? 'self' : '';
-          const backendTag = device.source === 'backend' ? '<span class="tag" style="background:#f39c12;">BACKEND</span>' : '';
-          const hasLocalAccess = device.ip && device.ip !== 'null' && device.ip !== 'unknown';
+          const ipDisplay = device.ip + ':' + device.port;
 
-          // Display IP or "No local access" for backend-only devices
-          const ipDisplay = hasLocalAccess ? device.ip + ':' + device.port : 'No local IP (backend only)';
+          const controls = '<div class="device-controls">' +
+            '<button class="off" onclick="setSpeedOnDevice(\'' + device.ip + '\', \'' + device.port + '\', 0)">Off</button>' +
+            '<button class="medium" onclick="setSpeedOnDevice(\'' + device.ip + '\', \'' + device.port + '\', 50)">50%</button>' +
+            '<button class="high" onclick="setSpeedOnDevice(\'' + device.ip + '\', \'' + device.port + '\', 100)">100%</button>' +
+            '</div>';
 
-          // Show controls only if we have local network access
-          let controls = '';
-          if (hasLocalAccess) {
-            controls = '<div class="device-controls">' +
-              '<button class="off" onclick="setSpeedOnDevice(\'' + device.ip + '\', \'' + device.port + '\', 0)">Off</button>' +
-              '<button class="medium" onclick="setSpeedOnDevice(\'' + device.ip + '\', \'' + device.port + '\', 50)">50%</button>' +
-              '<button class="high" onclick="setSpeedOnDevice(\'' + device.ip + '\', \'' + device.port + '\', 100)">100%</button>' +
-              '</div>';
-          } else {
-            controls = '<div class="device-controls"><span style="color:#888;font-size:12px;">Control via Miner Dashboard</span></div>';
-          }
-
-          const statusId = hasLocalAccess ? 'status-' + device.ip : 'status-' + (device.device_id || device.hostname);
+          const statusId = 'status-' + device.ip;
 
           return '<div class="device-item ' + selfClass + '">' +
               '<div>' +
-                '<div class="device-name">' + device.hostname + selfTag + backendTag + '</div>' +
+                '<div class="device-name">' + device.hostname + selfTag + '</div>' +
                 '<div class="device-ip">' + ipDisplay + '</div>' +
               '</div>' +
               controls +
