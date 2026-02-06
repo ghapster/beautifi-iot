@@ -1,0 +1,10 @@
+{
+  "version": "0.3.0",
+  "release_date": "2026-02-06T16:46:16Z",
+  "download_url": "https://github.com/ghapster/beautifi-iot/releases/download/v0.3.0/beautifi-iot-v0.3.0.zip",
+  "file_hash": "82de85edcbe980cecd0aad76217b3c490500c6fdfbe44829a8bb2f86183bc919",
+  "file_size": 116864,
+  "changelog": "Hide off-network devices from fan dashboard, fix OTA manifest URL, bump to v0.3.0",
+  "min_version": "0.1.0",
+  "signature": ""
+}
