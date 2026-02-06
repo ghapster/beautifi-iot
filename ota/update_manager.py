@@ -111,7 +111,7 @@ class UpdateManager:
     STATE_FILE = "update_state.json"
 
     # Update manifest URL (configurable)
-    DEFAULT_MANIFEST_URL = "https://raw.githubusercontent.com/ghapster/beautifi-iot/master/releases/latest.json"
+    DEFAULT_MANIFEST_URL = "https://raw.githubusercontent.com/ghapster/beautifi-iot/main/releases/latest.json"
 
     def __init__(
         self,
