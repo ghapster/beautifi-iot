@@ -544,14 +544,14 @@ Set up end-to-end OTA firmware delivery:
 | **v0.3.0** | Hide off-network devices from fan dashboard, fix OTA manifest URL (master→main) | [GitHub Release](https://github.com/ghapster/beautifi-iot/releases/tag/v0.3.0) |
 | **v0.4.0** | Auto-fix avahi IPv6 on startup (`use-ipv6=no`), self-healing mDNS | [GitHub Release](https://github.com/ghapster/beautifi-iot/releases/tag/v0.4.0) |
 | **v0.4.1** | Fix AAAA record publishing (`publish-aaaa-on-ipv4=no`), always restart avahi-daemon on boot | [GitHub Release](https://github.com/ghapster/beautifi-iot/releases/tag/v0.4.1) |
+| **v0.5.0** | Report local network IP in telemetry for miner dashboard "Local Access" link | [GitHub Release](https://github.com/ghapster/beautifi-iot/releases/tag/v0.5.0) |
 
-**Current firmware version: v0.4.1**
+**Current firmware version: v0.5.0**
 
 **OTA Flow (verified working):**
 - Manifest at: `https://raw.githubusercontent.com/ghapster/beautifi-iot/main/releases/latest.json`
 - `master` branch kept in sync with `main` for backwards compatibility (v0.2.0 devices check `/master/`)
-- IoT #2 successfully auto-updated v0.2.0 → v0.3.0 → v0.4.0 → v0.4.1 via OTA
-- IoT #1 auto-updated to v0.4.1 via OTA
+- IoT #1 and #2 successfully auto-updated through v0.2.0 → v0.3.0 → v0.4.0 → v0.4.1 → v0.5.0 via OTA
 
 **To publish a new OTA release:**
 1. Bump `FIRMWARE_VERSION` in `config.py`
@@ -593,10 +593,10 @@ Set up end-to-end OTA firmware delivery:
 **Device avahi status (all fixed):**
 | Device | Firmware | avahi Fix | Method |
 |--------|----------|----------|--------|
-| IoT #1 (beautifi-1) | v0.4.1 | ✅ | OTA + manual `publish-aaaa-on-ipv4=no` |
-| IoT #2 (beautifi-2) | v0.4.1 | ✅ | OTA + manual `publish-aaaa-on-ipv4=no` |
-| IoT #3 (beautifi-3) | v0.2.0 | Pending | Will self-fix via OTA v0.4.1 when powered on |
-| IoT #4 (beautifi-4) | Unknown | Pending | Will self-fix via OTA v0.4.1 when powered on |
+| IoT #1 (beautifi-1) | v0.5.0 | ✅ | OTA (self-healed on startup) |
+| IoT #2 (beautifi-2) | v0.5.0 | ✅ | OTA (self-healed on startup) |
+| IoT #3 (beautifi-3) | v0.2.0 | Pending | Will self-fix via OTA when powered on |
+| IoT #4 (beautifi-4) | Unknown | Pending | Will self-fix via OTA when powered on |
 
 #### Fan Dashboard - Local Network Only (v0.3.0)
 The fan control dashboard (`/dashboard`) now only shows devices reachable on the local network. Backend-discovered devices from other networks are hidden from end users.
@@ -615,18 +615,53 @@ Added to `C:\Windows\System32\drivers\etc\hosts` on dev machine:
 ```
 **Note:** If device IPs change (DHCP), these entries need to be updated manually. Consider setting static IPs on the router for the Pis.
 
+#### Local Access IP Link - Miner Dashboard (v0.5.0)
+**Problem:** mDNS (.local) is unreliable across different phones, routers, and operating systems. Salon operators need a reliable way to access their device's local fan control dashboard from any device on the same network.
+
+**Solution:** Full-stack feature across all 3 repos:
+
+1. **IoT Device** (`telemetry/collector.py`): `_get_local_ip()` method uses UDP socket trick to detect local IP, cached 60 seconds. Included in every telemetry sample as `local_ip` field.
+2. **Backend** (`routes/telemetry.js`, `routes/miner.js`): Migration 008 adds `local_ip VARCHAR(45)` to `devices` table. Telemetry stream handler extracts and stores it. Miner API and device status endpoints return it.
+3. **Miner Dashboard** (`DeviceDetailPanel.jsx`): Shows clickable "Local Access: IP:5000" link when device is online and has reported its IP. Opens in new tab, styled with teal theme, "(same network only)" hint.
+
+**Data flow:**
+```
+IoT (every 12s) → POST /api/telemetry/stream {local_ip: "192.168.0.134"}
+    → Backend stores in devices.local_ip
+    → GET /api/miner/:wallet returns local_ip
+    → Dashboard shows clickable link
+```
+
+**Key properties:**
+- IP auto-updates every 12 seconds — if DHCP changes the IP, the dashboard stays current
+- Backward compatible: `COALESCE($3, local_ip)` in SQL means older firmware without `local_ip` won't overwrite existing values
+- Only shown when device is online (hides stale IPs from offline devices)
+- No dependency on mDNS, Bonjour, or any network discovery protocol
+
+**Files changed:**
+| Repo | File | Change |
+|------|------|--------|
+| beautifi-iot | `telemetry/collector.py` | Added `_get_local_ip()` with 60s cache, inject into samples |
+| beautifi-iot | `config.py` | Bumped `FIRMWARE_VERSION` to `0.5.0` |
+| salon-safe-backend | `migrations/008_device_local_ip.sql` | `ALTER TABLE devices ADD COLUMN local_ip VARCHAR(45)` |
+| salon-safe-backend | `routes/telemetry.js` | Extract `local_ip` from payload, store in devices table, return in status API |
+| salon-safe-backend | `routes/miner.js` | Query devices table for `local_ip`, include in miner API response |
+| salonsafe-vite | `src/components/MinerDashboard.jsx` | Thread `local_ip` through to device objects |
+| salonsafe-vite | `src/components/DeviceDetailPanel.jsx` | Render clickable Local Access link |
+
 #### Current Device Status (Feb 7, 2026)
 
 | Device | Hostname | IP | Device ID | Firmware | Network | Status |
 |--------|----------|----|-----------|----------|---------|--------|
-| IoT #1 | beautifi-1 | 192.168.0.151 | btfi-e8a6eb4a363fe54e | v0.4.1 | Local | ✅ Operational |
-| IoT #2 | beautifi-2 | 192.168.0.134 | btfi-9c5263e883ee1b97 | v0.4.1 | Local | ✅ Operational |
-| IoT #3 | beautifi-3 | 192.168.1.165 | btfi-5e93d18822a826b3 | v0.2.0 | Offsite | ⏳ Awaiting OTA v0.4.1 |
-| IoT #4 | beautifi-4 | 192.168.0.119 | btfi-49311ccf334d9d45 | Unknown | Offline | ⏳ Awaiting OTA v0.4.1 |
+| IoT #1 | beautifi-1 | 192.168.0.151 | btfi-e8a6eb4a363fe54e | v0.5.0 | Local | ✅ Operational |
+| IoT #2 | beautifi-2 | 192.168.0.134 | btfi-9c5263e883ee1b97 | v0.5.0 | Local | ✅ Operational |
+| IoT #3 | beautifi-3 | 192.168.1.165 | btfi-5e93d18822a826b3 | v0.2.0 | Offsite | ⏳ Awaiting OTA v0.5.0 |
+| IoT #4 | beautifi-4 | 192.168.0.119 | btfi-49311ccf334d9d45 | Unknown | Offline | ⏳ Awaiting OTA v0.5.0 |
 
 ### Known Issues / TODO
 - **WiFi Provisioning UI** (Low Priority): The setup interface at `192.168.4.1:5000` is functional but not polished. Network scanning doesn't work in AP mode (hardware limitation - wlan0 can't scan while running hostapd). Manual SSID entry works correctly. Needs UI/UX improvements after IoT testing is complete.
 - **Static IPs**: Consider setting static DHCP reservations on the router for all Pis so hosts file entries and bookmarks remain valid.
+- **OTA Signature Verification**: Currently logs `WARNING: No trusted public key configured`. Low priority for prototyping but needed before production.
 
 ---
 
