@@ -1335,21 +1335,26 @@ def fix_avahi_ipv6():
     """Disable IPv6 in avahi to prevent .local resolving to unusable link-local addresses."""
     avahi_conf = "/etc/avahi/avahi-daemon.conf"
     try:
+        import subprocess
         with open(avahi_conf, 'r') as f:
             content = f.read()
+        changed = False
         if 'use-ipv6=yes' in content:
-            import subprocess
             subprocess.run(
                 ["sudo", "sed", "-i", "s/use-ipv6=yes/use-ipv6=no/", avahi_conf],
                 timeout=5, check=True
             )
-            subprocess.run(
-                ["sudo", "systemctl", "restart", "avahi-daemon"],
-                timeout=10, check=True
-            )
-            print("[SYSTEM] Fixed avahi IPv6 - .local now resolves to IPv4")
+            changed = True
+        # Always restart avahi-daemon to ensure running config matches file
+        # (OTA only restarts beautifi-iot, not avahi-daemon)
+        subprocess.run(
+            ["sudo", "systemctl", "restart", "avahi-daemon"],
+            timeout=10, check=True
+        )
+        if changed:
+            print("[SYSTEM] Fixed avahi IPv6 config and restarted avahi-daemon")
         else:
-            print("[SYSTEM] avahi IPv6 already disabled")
+            print("[SYSTEM] avahi IPv6 already disabled, restarted avahi-daemon")
     except Exception as e:
         print(f"[SYSTEM] avahi check skipped: {e}")
 
