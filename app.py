@@ -1345,6 +1345,16 @@ def fix_avahi_ipv6():
                 timeout=5, check=True
             )
             changed = True
+        # Also disable publishing AAAA records over IPv4 mDNS
+        # Without this, avahi still advertises fe80:: addresses via IPv4 multicast
+        if 'publish-aaaa-on-ipv4=no' not in content:
+            subprocess.run(
+                ["sudo", "sed", "-i",
+                 "s/#publish-aaaa-on-ipv4=yes/publish-aaaa-on-ipv4=no/",
+                 avahi_conf],
+                timeout=5, check=True
+            )
+            changed = True
         # Always restart avahi-daemon to ensure running config matches file
         # (OTA only restarts beautifi-iot, not avahi-daemon)
         subprocess.run(

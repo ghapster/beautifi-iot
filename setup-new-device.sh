@@ -87,6 +87,8 @@ sudo systemctl start avahi-daemon 2>/dev/null || true
 
 # Disable IPv6 in avahi to prevent .local resolving to unusable link-local IPv6 addresses
 sudo sed -i 's/use-ipv6=yes/use-ipv6=no/' /etc/avahi/avahi-daemon.conf
+# Also stop publishing AAAA records over IPv4 mDNS (browsers prefer IPv6 and fail on fe80::)
+sudo sed -i 's/#publish-aaaa-on-ipv4=yes/publish-aaaa-on-ipv4=no/' /etc/avahi/avahi-daemon.conf
 echo "Disabled IPv6 in avahi (prevents .local resolution failures)"
 
 # Install avahi service file for device discovery
