@@ -85,6 +85,10 @@ echo "hostapd and dnsmasq configured for AP mode"
 sudo systemctl enable avahi-daemon 2>/dev/null || true
 sudo systemctl start avahi-daemon 2>/dev/null || true
 
+# Disable IPv6 in avahi to prevent .local resolving to unusable link-local IPv6 addresses
+sudo sed -i 's/use-ipv6=yes/use-ipv6=no/' /etc/avahi/avahi-daemon.conf
+echo "Disabled IPv6 in avahi (prevents .local resolution failures)"
+
 # Install avahi service file for device discovery
 if [ -f "$INSTALL_DIR/avahi/beautifi.service" ]; then
     sudo cp "$INSTALL_DIR/avahi/beautifi.service" /etc/avahi/services/
