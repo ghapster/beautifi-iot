@@ -1,10 +1,10 @@
 {
   "version": "0.4.1",
-  "release_date": "2026-02-07T17:56:00Z",
+  "release_date": "2026-02-07T18:01:00Z",
   "download_url": "https://github.com/ghapster/beautifi-iot/releases/download/v0.4.1/beautifi-iot-v0.4.1.zip",
-  "file_hash": "dfe40cc0e8770c5e005b038fcddf26b054fb0501640a86b160a8d60f1f0b8ff6",
-  "file_size": 119254,
-  "changelog": "Always restart avahi-daemon on startup to ensure .local resolution works after OTA updates",
+  "file_hash": "8872087696a8da6d4999c094b6b4b753d0b52dc02770a44eda4b3bfbf783689a",
+  "file_size": 119431,
+  "changelog": "Fix .local resolution: disable AAAA record publishing, always restart avahi on boot",
   "min_version": "0.1.0",
   "signature": ""
 }
