@@ -1,10 +1,10 @@
 {
-  "version": "0.4.0",
-  "release_date": "2026-02-07T12:00:00Z",
-  "download_url": "https://github.com/ghapster/beautifi-iot/releases/download/v0.4.0/beautifi-iot-v0.4.0.zip",
-  "file_hash": "37ed65b21cec19cc0478b195a78461e740b1e670d8fb078db68f6dfad9a009e6",
-  "file_size": 119170,
-  "changelog": "Auto-fix avahi IPv6 on startup for reliable .local resolution, local-only device list on fan dashboard",
+  "version": "0.4.1",
+  "release_date": "2026-02-07T17:56:00Z",
+  "download_url": "https://github.com/ghapster/beautifi-iot/releases/download/v0.4.1/beautifi-iot-v0.4.1.zip",
+  "file_hash": "dfe40cc0e8770c5e005b038fcddf26b054fb0501640a86b160a8d60f1f0b8ff6",
+  "file_size": 119254,
+  "changelog": "Always restart avahi-daemon on startup to ensure .local resolution works after OTA updates",
   "min_version": "0.1.0",
   "signature": ""
 }
