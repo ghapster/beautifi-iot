@@ -67,7 +67,13 @@ http://beautifi-4.local:5000/dashboard
 
 The `.local` address works on most home networks via mDNS/Bonjour.
 
-> **mDNS Note:** The device auto-disables IPv6 in avahi on startup to prevent `.local` resolving to unusable IPv6 link-local addresses. This fix is applied automatically via OTA updates (v0.4.0+).
+> **mDNS Note:** The device auto-fixes avahi IPv6 on every startup (v0.4.1+): disables IPv6 (`use-ipv6=no`), stops AAAA record publishing over IPv4 (`publish-aaaa-on-ipv4=no`), and always restarts avahi-daemon. This prevents `.local` from resolving to unusable `fe80::` link-local addresses. Applied automatically via OTA.
+
+### 5. Local Access via Miner Dashboard (v0.5.0+)
+
+For phones and devices where mDNS is unreliable, the **Miner Dashboard** shows a clickable "Local Access" link for each online device. The link opens the device's fan control dashboard directly by IP — no `.local` resolution needed.
+
+Each device self-reports its local IP in telemetry every 12 seconds, so the dashboard link stays current even if DHCP reassigns the address. Just open the miner dashboard on any device connected to the same network as the IoT device.
 
 ## Features
 
@@ -79,6 +85,7 @@ The `.local` address works on most home networks via mDNS/Bonjour.
 - **Remote Control**: Dashboard can toggle fans and set speed (50%/100%)
 - **WiFi Provisioning**: AP mode fallback for initial setup
 - **Anomaly Detection**: Statistical outlier and tamper detection
+- **Local IP Reporting**: Self-reports LAN IP in telemetry for miner dashboard access link
 
 ## Hardware
 
@@ -214,7 +221,7 @@ The backend can send update commands to specific devices:
 - **Backup created** before each update
 - **Rollback available** if update fails
 - **Signature verification** (optional, for production)
-- **System config fixes** applied on startup (e.g., avahi IPv6 fix in v0.4.0)
+- **System config fixes** applied on startup (e.g., avahi IPv6 + AAAA fix in v0.4.1)
 
 ## Remote Fan Control
 
@@ -279,16 +286,18 @@ Returns all discoverable devices:
 
 | Device | Hostname | Device ID | Status |
 |--------|----------|-----------|--------|
-| IoT #1 | beautifi-1 | btfi-e8a6eb4a363fe54e | ✅ Fully operational |
-| IoT #2 | beautifi-2 | btfi-9c5263e883ee1b97 | ✅ Fully operational |
-| IoT #3 | beautifi-3 | btfi-5e93d18822a826b3 | ✅ Fully operational |
-| IoT #4 | beautifi-4 | btfi-49311ccf334d9d45 | ✅ Fully operational |
+| Device | Hostname | Device ID | Firmware | Status |
+|--------|----------|-----------|----------|--------|
+| IoT #1 | beautifi-1 | btfi-e8a6eb4a363fe54e | v0.5.0 | ✅ Operational |
+| IoT #2 | beautifi-2 | btfi-9c5263e883ee1b97 | v0.5.0 | ✅ Operational |
+| IoT #3 | beautifi-3 | btfi-5e93d18822a826b3 | v0.2.0 | ⏳ Awaiting OTA |
+| IoT #4 | beautifi-4 | btfi-49311ccf334d9d45 | Unknown | ⏳ Awaiting OTA |
 
 All prototype devices have:
-- Latest code from GitHub
 - WiFi AP mode provisioning configured and tested (hostapd/dnsmasq)
 - Fan control working via PWM
 - Service files configured to run as root (required for AP mode)
+- OTA auto-update enabled (will self-update when powered on)
 
 ### Hardware Troubleshooting Notes
 
@@ -326,4 +335,13 @@ The red wire is a **power OUTPUT** from the fan's internal controller (meant for
 
 See `CLAUDE.md` for detailed architecture, wiring diagrams, and implementation notes.
 
-*Last Updated: February 7, 2026 (OTA v0.4.0 - mDNS IPv6 fix, local-only device list)*
+### Firmware Release History
+
+| Version | Date | Changes |
+|---------|------|---------|
+| v0.5.0 | Feb 7, 2026 | Report local IP in telemetry for miner dashboard Local Access link |
+| v0.4.1 | Feb 7, 2026 | Fix AAAA record publishing, always restart avahi on boot |
+| v0.4.0 | Feb 7, 2026 | Auto-fix avahi IPv6 on startup |
+| v0.3.0 | Feb 6, 2026 | Hide off-network devices from fan dashboard, fix OTA manifest URL |
+
+*Last Updated: February 7, 2026 (Firmware v0.5.0 - Local Access IP link)*
