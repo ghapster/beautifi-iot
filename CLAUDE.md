@@ -542,12 +542,16 @@ Set up end-to-end OTA firmware delivery:
 | Version | Changes | Release |
 |---------|---------|---------|
 | **v0.3.0** | Hide off-network devices from fan dashboard, fix OTA manifest URL (master→main) | [GitHub Release](https://github.com/ghapster/beautifi-iot/releases/tag/v0.3.0) |
-| **v0.4.0** | Auto-fix avahi IPv6 on startup, self-healing mDNS | Pending release |
+| **v0.4.0** | Auto-fix avahi IPv6 on startup (`use-ipv6=no`), self-healing mDNS | [GitHub Release](https://github.com/ghapster/beautifi-iot/releases/tag/v0.4.0) |
+| **v0.4.1** | Fix AAAA record publishing (`publish-aaaa-on-ipv4=no`), always restart avahi-daemon on boot | [GitHub Release](https://github.com/ghapster/beautifi-iot/releases/tag/v0.4.1) |
+
+**Current firmware version: v0.4.1**
 
 **OTA Flow (verified working):**
 - Manifest at: `https://raw.githubusercontent.com/ghapster/beautifi-iot/main/releases/latest.json`
 - `master` branch kept in sync with `main` for backwards compatibility (v0.2.0 devices check `/master/`)
-- IoT #2 successfully auto-updated from v0.2.0 → v0.3.0 via OTA
+- IoT #2 successfully auto-updated v0.2.0 → v0.3.0 → v0.4.0 → v0.4.1 via OTA
+- IoT #1 auto-updated to v0.4.1 via OTA
 
 **To publish a new OTA release:**
 1. Bump `FIRMWARE_VERSION` in `config.py`
@@ -558,21 +562,41 @@ Set up end-to-end OTA firmware delivery:
 6. Update `releases/latest.json` with new version, download URL, and hash
 7. Push manifest and sync `master` branch: `git branch -f master main && git push origin master --force-with-lease`
 
-#### mDNS / .local Resolution Fix
-**Problem:** Avahi advertised IPv6 link-local addresses (`fe80::...`) for `.local` hostnames. Browsers cannot connect to these, causing "site can't be reached" after initial DNS cache expired.
+#### mDNS / .local Resolution Fix (COMPLETE)
+**Problem:** Avahi advertised IPv6 link-local addresses (`fe80::...`) for `.local` hostnames. Browsers prefer IPv6 over IPv4 (RFC 6724), tried the `fe80::` address, and failed with "site can't be reached".
 
-**Fix (3 layers):**
-1. **Startup self-heal** (`app.py`): `fix_avahi_ipv6()` runs on every boot, auto-fixes `/etc/avahi/avahi-daemon.conf` if IPv6 is enabled. Delivered via OTA.
-2. **Setup script** (`setup-new-device.sh`): New devices get `use-ipv6=no` during initial setup.
-3. **Manual fix** for existing devices: `sudo sed -i 's/use-ipv6=yes/use-ipv6=no/' /etc/avahi/avahi-daemon.conf && sudo systemctl restart avahi-daemon`
+**Root Cause (two layers):**
+1. `use-ipv6=yes` (avahi default) — avahi communicated over IPv6
+2. `publish-aaaa-on-ipv4=yes` (avahi default, commented out) — even with `use-ipv6=no`, avahi still **published AAAA (IPv6) records over IPv4 mDNS**. This was the real culprit: browsers received both A and AAAA records, preferred IPv6, and failed.
 
-**Status:**
-| Device | avahi Fix | Method |
-|--------|----------|--------|
-| IoT #1 | ✅ | Manual SSH |
-| IoT #2 | ✅ | Manual SSH |
-| IoT #3 | Pending | Will self-fix via OTA v0.4.0 |
-| IoT #4 | Pending | Will self-fix via OTA v0.4.0 |
+**Fix (v0.4.1, 4 layers):**
+1. **Startup self-heal** (`app.py:fix_avahi_ipv6()`): Runs on every boot. Sets `use-ipv6=no` and `publish-aaaa-on-ipv4=no` in avahi config. **Always restarts avahi-daemon** (even if config unchanged) to ensure running daemon matches file. Delivered via OTA.
+2. **Setup script** (`setup-new-device.sh`): New devices get both settings during initial setup.
+3. **Manual fix** for existing devices:
+   ```bash
+   sudo sed -i 's/use-ipv6=yes/use-ipv6=no/' /etc/avahi/avahi-daemon.conf
+   sudo sed -i 's/#publish-aaaa-on-ipv4=yes/publish-aaaa-on-ipv4=no/' /etc/avahi/avahi-daemon.conf
+   sudo systemctl restart avahi-daemon
+   ```
+4. **Windows hosts file** (`C:\Windows\System32\drivers\etc\hosts`): Added static entries as fallback so `.local` works even if mDNS/Bonjour has issues.
+
+**Avahi fix_avahi_ipv6() evolution:**
+- v0.4.0: Only set `use-ipv6=no`, only restarted avahi if config changed — **insufficient** (AAAA still published, and avahi not restarted after OTA)
+- v0.4.1: Also sets `publish-aaaa-on-ipv4=no`, **always** restarts avahi-daemon on boot — **complete fix**
+
+**Windows-side .local issues:**
+- Windows Bonjour service caches mDNS responses. Stale AAAA records persist until Bonjour is restarted (requires admin: `net stop "Bonjour Service" && net start "Bonjour Service"`)
+- `ipconfig /flushdns` clears Windows DNS cache but NOT Bonjour cache
+- Static hosts file entries (`C:\Windows\System32\drivers\etc\hosts`) bypass mDNS entirely — most reliable
+- A fix script was created at `C:\Users\CO-OP\fix-mdns.ps1` (run as admin) that adds hosts entries + restarts Bonjour
+
+**Device avahi status (all fixed):**
+| Device | Firmware | avahi Fix | Method |
+|--------|----------|----------|--------|
+| IoT #1 (beautifi-1) | v0.4.1 | ✅ | OTA + manual `publish-aaaa-on-ipv4=no` |
+| IoT #2 (beautifi-2) | v0.4.1 | ✅ | OTA + manual `publish-aaaa-on-ipv4=no` |
+| IoT #3 (beautifi-3) | v0.2.0 | Pending | Will self-fix via OTA v0.4.1 when powered on |
+| IoT #4 (beautifi-4) | Unknown | Pending | Will self-fix via OTA v0.4.1 when powered on |
 
 #### Fan Dashboard - Local Network Only (v0.3.0)
 The fan control dashboard (`/dashboard`) now only shows devices reachable on the local network. Backend-discovered devices from other networks are hidden from end users.
@@ -583,8 +607,26 @@ The legacy hardcoded device ID has been marked as `status: retired`, `activation
 #### IoT #3 Device ID Fixed
 IoT #3 was offsite with old `config.py` that hardcoded `DEVICE_ID = "btfi-iot-001"`. Fixed via SSH `git pull` to get commit `af199c7` which loads ID from `~/.beautifi/keys/identity.json`. Now correctly reports as `btfi-5e93d18822a826b3`.
 
+#### Windows Hosts File Entries
+Added to `C:\Windows\System32\drivers\etc\hosts` on dev machine:
+```
+192.168.0.151 beautifi-1.local
+192.168.0.134 beautifi-2.local
+```
+**Note:** If device IPs change (DHCP), these entries need to be updated manually. Consider setting static IPs on the router for the Pis.
+
+#### Current Device Status (Feb 7, 2026)
+
+| Device | Hostname | IP | Device ID | Firmware | Network | Status |
+|--------|----------|----|-----------|----------|---------|--------|
+| IoT #1 | beautifi-1 | 192.168.0.151 | btfi-e8a6eb4a363fe54e | v0.4.1 | Local | ✅ Operational |
+| IoT #2 | beautifi-2 | 192.168.0.134 | btfi-9c5263e883ee1b97 | v0.4.1 | Local | ✅ Operational |
+| IoT #3 | beautifi-3 | 192.168.1.165 | btfi-5e93d18822a826b3 | v0.2.0 | Offsite | ⏳ Awaiting OTA v0.4.1 |
+| IoT #4 | beautifi-4 | 192.168.0.119 | btfi-49311ccf334d9d45 | Unknown | Offline | ⏳ Awaiting OTA v0.4.1 |
+
 ### Known Issues / TODO
 - **WiFi Provisioning UI** (Low Priority): The setup interface at `192.168.4.1:5000` is functional but not polished. Network scanning doesn't work in AP mode (hardware limitation - wlan0 can't scan while running hostapd). Manual SSID entry works correctly. Needs UI/UX improvements after IoT testing is complete.
+- **Static IPs**: Consider setting static DHCP reservations on the router for all Pis so hosts file entries and bookmarks remain valid.
 
 ---
 
