@@ -1,10 +1,10 @@
 {
-  "version": "0.4.1",
-  "release_date": "2026-02-07T18:01:00Z",
-  "download_url": "https://github.com/ghapster/beautifi-iot/releases/download/v0.4.1/beautifi-iot-v0.4.1.zip",
-  "file_hash": "8872087696a8da6d4999c094b6b4b753d0b52dc02770a44eda4b3bfbf783689a",
-  "file_size": 119431,
-  "changelog": "Fix .local resolution: disable AAAA record publishing, always restart avahi on boot",
+  "version": "0.5.0",
+  "release_date": "2026-02-07T19:00:00Z",
+  "download_url": "https://github.com/ghapster/beautifi-iot/releases/download/v0.5.0/beautifi-iot-v0.5.0.zip",
+  "file_hash": "f24408e7f99f18f6d3fa39bf136451acd94c3f4f46d29ef2fd8ff0c4e760bf06",
+  "file_size": 120648,
+  "changelog": "Report local network IP in telemetry for miner dashboard Local Access link",
   "min_version": "0.1.0",
   "signature": ""
 }
