@@ -186,6 +186,10 @@ class TelemetryCollector:
             # TODO: Initialize real sensors when available
             self.sensors = SimulatedSensors(self.fan_interpolator)
 
+        # Local IP cache (refreshed every 60 seconds)
+        self._cached_ip = None
+        self._ip_cache_time = 0
+
         # Threading
         self._running = False
         self._thread: Optional[threading.Thread] = None
@@ -201,6 +205,23 @@ class TelemetryCollector:
 
         # Initialize database
         self._init_db()
+
+    def _get_local_ip(self):
+        """Get the device's local network IP address (cached for 60 seconds)."""
+        import socket
+        now = time.time()
+        if self._cached_ip and (now - self._ip_cache_time) < 60:
+            return self._cached_ip
+        try:
+            s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+            s.connect(('8.8.8.8', 80))
+            ip = s.getsockname()[0]
+            s.close()
+            self._cached_ip = ip
+            self._ip_cache_time = now
+            return ip
+        except Exception:
+            return self._cached_ip
 
     def _init_db(self):
         """Initialize SQLite database for telemetry buffering."""
@@ -612,6 +633,9 @@ class TelemetryCollector:
 
                 # Read sensors
                 sample = self.sensors.read_all(current_pwm)
+
+                # Add local network IP for dashboard discovery
+                sample["local_ip"] = self._get_local_ip()
 
                 # Check for anomalies before signing
                 anomaly_flags = []
