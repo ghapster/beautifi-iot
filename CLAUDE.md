@@ -534,6 +534,55 @@ User asked about simplifying to 1 fan. Current setup:
 - Cannot eliminate 12V - needed for 0-10V signal generation
 - Could eliminate DROK if Pi powered separately, but still need 12V for converters
 
+### Session Notes (Feb 6-7, 2026)
+
+#### OTA Update Infrastructure - FULLY OPERATIONAL
+Set up end-to-end OTA firmware delivery:
+
+| Version | Changes | Release |
+|---------|---------|---------|
+| **v0.3.0** | Hide off-network devices from fan dashboard, fix OTA manifest URL (master→main) | [GitHub Release](https://github.com/ghapster/beautifi-iot/releases/tag/v0.3.0) |
+| **v0.4.0** | Auto-fix avahi IPv6 on startup, self-healing mDNS | Pending release |
+
+**OTA Flow (verified working):**
+- Manifest at: `https://raw.githubusercontent.com/ghapster/beautifi-iot/main/releases/latest.json`
+- `master` branch kept in sync with `main` for backwards compatibility (v0.2.0 devices check `/master/`)
+- IoT #2 successfully auto-updated from v0.2.0 → v0.3.0 via OTA
+
+**To publish a new OTA release:**
+1. Bump `FIRMWARE_VERSION` in `config.py`
+2. Commit and push to `main`
+3. `git archive --format=zip --prefix=beautifi-iot/ -o beautifi-iot-vX.Y.Z.zip HEAD`
+4. `certutil -hashfile beautifi-iot-vX.Y.Z.zip SHA256` (get hash)
+5. Create GitHub Release via API or web UI, attach ZIP
+6. Update `releases/latest.json` with new version, download URL, and hash
+7. Push manifest and sync `master` branch: `git branch -f master main && git push origin master --force-with-lease`
+
+#### mDNS / .local Resolution Fix
+**Problem:** Avahi advertised IPv6 link-local addresses (`fe80::...`) for `.local` hostnames. Browsers cannot connect to these, causing "site can't be reached" after initial DNS cache expired.
+
+**Fix (3 layers):**
+1. **Startup self-heal** (`app.py`): `fix_avahi_ipv6()` runs on every boot, auto-fixes `/etc/avahi/avahi-daemon.conf` if IPv6 is enabled. Delivered via OTA.
+2. **Setup script** (`setup-new-device.sh`): New devices get `use-ipv6=no` during initial setup.
+3. **Manual fix** for existing devices: `sudo sed -i 's/use-ipv6=yes/use-ipv6=no/' /etc/avahi/avahi-daemon.conf && sudo systemctl restart avahi-daemon`
+
+**Status:**
+| Device | avahi Fix | Method |
+|--------|----------|--------|
+| IoT #1 | ✅ | Manual SSH |
+| IoT #2 | ✅ | Manual SSH |
+| IoT #3 | Pending | Will self-fix via OTA v0.4.0 |
+| IoT #4 | Pending | Will self-fix via OTA v0.4.0 |
+
+#### Fan Dashboard - Local Network Only (v0.3.0)
+The fan control dashboard (`/dashboard`) now only shows devices reachable on the local network. Backend-discovered devices from other networks are hidden from end users.
+
+#### Device `btfi-iot-001` Retired
+The legacy hardcoded device ID has been marked as `status: retired`, `activation_status: deactivated` in the backend. Historical data (18 epochs, 1.15M TAR) preserved. Admin dashboard has Active/Retired/All filter.
+
+#### IoT #3 Device ID Fixed
+IoT #3 was offsite with old `config.py` that hardcoded `DEVICE_ID = "btfi-iot-001"`. Fixed via SSH `git pull` to get commit `af199c7` which loads ID from `~/.beautifi/keys/identity.json`. Now correctly reports as `btfi-5e93d18822a826b3`.
+
 ### Known Issues / TODO
 - **WiFi Provisioning UI** (Low Priority): The setup interface at `192.168.4.1:5000` is functional but not polished. Network scanning doesn't work in AP mode (hardware limitation - wlan0 can't scan while running hostapd). Manual SSID entry works correctly. Needs UI/UX improvements after IoT testing is complete.
 

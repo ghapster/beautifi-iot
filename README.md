@@ -67,6 +67,8 @@ http://beautifi-4.local:5000/dashboard
 
 The `.local` address works on most home networks via mDNS/Bonjour.
 
+> **mDNS Note:** The device auto-disables IPv6 in avahi on startup to prevent `.local` resolving to unusable IPv6 link-local addresses. This fix is applied automatically via OTA updates (v0.4.0+).
+
 ## Features
 
 - **Fan Control**: PWM control for up to 3 fans via GPIO
@@ -212,6 +214,7 @@ The backend can send update commands to specific devices:
 - **Backup created** before each update
 - **Rollback available** if update fails
 - **Signature verification** (optional, for production)
+- **System config fixes** applied on startup (e.g., avahi IPv6 fix in v0.4.0)
 
 ## Remote Fan Control
 
@@ -238,8 +241,8 @@ The fan dashboard (`/dashboard`) can discover and control multiple BeautiFi devi
 ### Dashboard Features
 
 - **THIS DEVICE** tag: Identifies the device you're directly connected to
-- **BACKEND** tag: Devices discovered via backend (control via Miner Dashboard)
-- Fan speed controls: Off / 50% / 100% for devices with local network access
+- Fan speed controls: Off / 50% / 100% for all locally reachable devices
+- Only devices on the same local network are shown (v0.3.0+)
 - Auto-refresh: Click "Refresh" to rescan the network
 
 ### API Endpoint
@@ -323,4 +326,4 @@ The red wire is a **power OUTPUT** from the fan's internal controller (meant for
 
 See `CLAUDE.md` for detailed architecture, wiring diagrams, and implementation notes.
 
-*Last Updated: February 4, 2026 (Multi-device discovery)*
+*Last Updated: February 7, 2026 (OTA v0.4.0 - mDNS IPv6 fix, local-only device list)*

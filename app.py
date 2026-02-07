@@ -1331,6 +1331,29 @@ ota_scheduler = OTAScheduler(update_manager, auto_install=True)
 # Main Entry Point
 # ============================================
 
+def fix_avahi_ipv6():
+    """Disable IPv6 in avahi to prevent .local resolving to unusable link-local addresses."""
+    avahi_conf = "/etc/avahi/avahi-daemon.conf"
+    try:
+        with open(avahi_conf, 'r') as f:
+            content = f.read()
+        if 'use-ipv6=yes' in content:
+            import subprocess
+            subprocess.run(
+                ["sudo", "sed", "-i", "s/use-ipv6=yes/use-ipv6=no/", avahi_conf],
+                timeout=5, check=True
+            )
+            subprocess.run(
+                ["sudo", "systemctl", "restart", "avahi-daemon"],
+                timeout=10, check=True
+            )
+            print("[SYSTEM] Fixed avahi IPv6 - .local now resolves to IPv4")
+        else:
+            print("[SYSTEM] avahi IPv6 already disabled")
+    except Exception as e:
+        print(f"[SYSTEM] avahi check skipped: {e}")
+
+
 if __name__ == '__main__':
     print("=" * 60)
     print("  BeautiFi IoT - DUAN Proof-of-Air Device")
@@ -1340,6 +1363,10 @@ if __name__ == '__main__':
     print(f"  Running on Pi: {RUNNING_ON_PI}")
     print(f"  Verifier: {VERIFIER_URL if ENABLE_VERIFIER_SYNC else 'DISABLED'}")
     print("=" * 60)
+
+    # Fix avahi IPv6 if needed (ensures .local resolves to IPv4)
+    if RUNNING_ON_PI:
+        fix_avahi_ipv6()
 
     # Check for pending OTA updates BEFORE starting fans
     # This ensures updates install on boot if device was off during previous update window
