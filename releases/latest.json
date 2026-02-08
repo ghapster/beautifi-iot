@@ -1,10 +1,10 @@
 {
-  "version": "0.5.0",
-  "release_date": "2026-02-07T19:00:00Z",
-  "download_url": "https://github.com/ghapster/beautifi-iot/releases/download/v0.5.0/beautifi-iot-v0.5.0.zip",
-  "file_hash": "f24408e7f99f18f6d3fa39bf136451acd94c3f4f46d29ef2fd8ff0c4e760bf06",
-  "file_size": 120648,
-  "changelog": "Report local network IP in telemetry for miner dashboard Local Access link",
+  "version": "0.6.0",
+  "release_date": "2026-02-08T19:00:00Z",
+  "download_url": "https://github.com/ghapster/beautifi-iot/releases/download/v0.6.0/beautifi-iot-v0.6.0.zip",
+  "file_hash": "96eb64137b5b73a80704ce5571b53c5ef48df3f03c6d013374d712fa62fb46a6",
+  "file_size": 123579,
+  "changelog": "AP+STA concurrent WiFi provisioning - hotspot stays active during connection with live status feedback",
   "min_version": "0.1.0",
   "signature": ""
 }
