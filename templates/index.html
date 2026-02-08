@@ -205,7 +205,11 @@
 
     function showMessage(text, type) {
       const msg = document.getElementById('message');
-      msg.textContent = text;
+      if (text.includes('<')) {
+        msg.innerHTML = text;
+      } else {
+        msg.textContent = text;
+      }
       msg.className = 'message ' + type;
       msg.classList.remove('hidden');
     }
@@ -304,6 +308,8 @@
       });
     }
 
+    let pollInterval = null;
+
     async function connectWifi() {
       const ssid = document.getElementById('ssid-input').value;
       const password = document.getElementById('password-input').value;
@@ -327,28 +333,83 @@
 
         const data = await resp.json();
 
-        if (data.success) {
-          if (data.connecting) {
-            // Device is switching networks - we'll lose connection
-            const hostname = data.hostname || 'your-device';
-            showMessage('Connecting to ' + ssid + '... The hotspot will shut down. Access your device at: http://' + hostname + '.local:5000', 'info');
-            btn.textContent = 'Connecting...';
-            // Don't re-enable button - page will become unresponsive
-            return;
-          }
-          showMessage('Connected successfully!', 'success');
-          setTimeout(checkStatus, 2000);
-        } else {
-          showMessage(data.message || 'Connection failed', 'error');
+        if (data.status === 'connecting') {
+          showMessage('Connecting to ' + ssid + '...', 'info');
+          startConnectionPolling(ssid);
+        } else if (data.error) {
+          showMessage(data.error, 'error');
+          btn.disabled = false;
+          btn.textContent = 'Connect';
         }
+      } catch (e) {
+        showMessage('Error: ' + e.message, 'error');
         btn.disabled = false;
         btn.textContent = 'Connect';
-      } catch (e) {
-        // This is expected when AP mode stops - the connection drops
-        showMessage('Device is connecting. The hotspot has stopped. Access your device at: http://' + window.deviceHostname + '.local:5000', 'info');
-        btn.textContent = 'Connecting...';
-        // Don't re-enable - page is unresponsive anyway
       }
+    }
+
+    function startConnectionPolling(ssid) {
+      let attempts = 0;
+      const maxAttempts = 45; // 90 seconds max
+
+      if (pollInterval) clearInterval(pollInterval);
+
+      pollInterval = setInterval(async () => {
+        attempts++;
+
+        try {
+          const resp = await fetch('/api/wifi/connect-status');
+          const data = await resp.json();
+
+          if (data.state === 'connected') {
+            clearInterval(pollInterval);
+            pollInterval = null;
+
+            const ip = data.ip || 'unknown';
+            const dashUrl = 'http://' + ip + ':5000/dashboard';
+
+            showMessage(
+              '<strong>Connected!</strong><br>' +
+              'Network: <strong>' + ssid + '</strong><br>' +
+              'IP Address: <strong>' + ip + '</strong><br><br>' +
+              '<a href="' + dashUrl + '" style="color:#00ff88;font-size:1.1em;">Open Dashboard &rarr;</a><br>' +
+              '<small style="color:#888;">Setup hotspot will shut down in 60 seconds.</small>',
+              'success'
+            );
+
+            document.getElementById('connect-btn').textContent = 'Connected!';
+            document.getElementById('next-steps').classList.remove('hidden');
+            checkStatus();
+
+          } else if (data.state === 'failed') {
+            clearInterval(pollInterval);
+            pollInterval = null;
+
+            const error = data.error || 'Connection failed';
+            showMessage('Failed to connect: ' + error, 'error');
+
+            const btn = document.getElementById('connect-btn');
+            btn.disabled = false;
+            btn.textContent = 'Retry';
+
+          } else if (data.state === 'connecting') {
+            const dots = '.'.repeat((attempts % 3) + 1);
+            showMessage('Connecting to ' + ssid + dots, 'info');
+          }
+
+        } catch (e) {
+          console.error('Poll error:', e);
+        }
+
+        if (attempts >= maxAttempts) {
+          clearInterval(pollInterval);
+          pollInterval = null;
+          showMessage('Connection timed out. Please try again.', 'error');
+          const btn = document.getElementById('connect-btn');
+          btn.disabled = false;
+          btn.textContent = 'Retry';
+        }
+      }, 2000);
     }
   </script>
 </body>

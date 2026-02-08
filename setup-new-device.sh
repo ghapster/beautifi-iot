@@ -81,6 +81,15 @@ sudo systemctl unmask hostapd 2>/dev/null || true
 
 echo "hostapd and dnsmasq configured for AP mode"
 
+# Configure NetworkManager to ignore uap0 (AP virtual interface managed by hostapd)
+sudo mkdir -p /etc/NetworkManager/conf.d/
+cat << EOF | sudo tee /etc/NetworkManager/conf.d/unmanaged-uap0.conf > /dev/null
+[keyfile]
+unmanaged-devices=interface-name:uap0
+EOF
+sudo systemctl restart NetworkManager 2>/dev/null || true
+echo "NetworkManager configured to ignore uap0 (AP+STA concurrent mode)"
+
 # Enable mDNS (avahi) for easy access via hostname.local
 sudo systemctl enable avahi-daemon 2>/dev/null || true
 sudo systemctl start avahi-daemon 2>/dev/null || true

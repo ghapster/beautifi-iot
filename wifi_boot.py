@@ -49,27 +49,35 @@ def get_wifi_info():
 
 
 def start_hostapd_mode():
-    """Start hostapd-based access point mode."""
-    print("[WIFI] Starting hostapd AP mode...")
+    """Start hostapd AP mode on uap0 virtual interface (concurrent AP+STA)."""
+    print("[WIFI] Starting AP+STA concurrent mode...")
 
-    # Tell NetworkManager to stop managing wlan0
-    run_cmd("nmcli dev set wlan0 managed no")
+    # Remove stale uap0 if it exists (idempotent)
+    run_cmd("iw dev uap0 del")
+    time.sleep(0.5)
+
+    # Create virtual AP interface from wlan0
+    success, output = run_cmd("iw dev wlan0 interface add uap0 type __ap")
+    if not success:
+        print(f"[WIFI] Failed to create uap0: {output}")
+        return False
     time.sleep(1)
 
-    # Set up the interface
-    run_cmd("ip addr flush dev wlan0")
-    run_cmd("ip addr add 192.168.4.1/24 dev wlan0")
-    run_cmd("ip link set wlan0 up")
+    # Configure uap0 with static IP for AP
+    run_cmd("ip addr flush dev uap0")
+    run_cmd("ip addr add 192.168.4.1/24 dev uap0")
+    run_cmd("ip link set uap0 up")
     time.sleep(1)
 
-    # Start hostapd and dnsmasq
+    # Start hostapd and dnsmasq (both configured for uap0)
     success1, out1 = run_cmd("systemctl start hostapd")
     success2, out2 = run_cmd("systemctl start dnsmasq")
 
     if success1 and success2:
-        print("[WIFI] AP mode started: BeautiFi-Setup")
+        print("[WIFI] AP mode started on uap0: BeautiFi-Setup")
         print("[WIFI] Password: beautifi123")
         print("[WIFI] Connect and go to http://192.168.4.1:5000")
+        print("[WIFI] wlan0 remains available for station mode")
         return True
     else:
         print(f"[WIFI] Failed to start AP: {out1} {out2}")
@@ -77,19 +85,22 @@ def start_hostapd_mode():
 
 
 def stop_hostapd_mode():
-    """Stop hostapd and return wlan0 to NetworkManager."""
+    """Stop hostapd and remove uap0 virtual interface."""
     print("[WIFI] Stopping hostapd AP mode...")
     run_cmd("systemctl stop hostapd")
     run_cmd("systemctl stop dnsmasq")
-    run_cmd("ip addr flush dev wlan0")
-    run_cmd("nmcli dev set wlan0 managed yes")
-    time.sleep(2)
+    run_cmd("ip link set uap0 down")
+    run_cmd("iw dev uap0 del")
+    time.sleep(1)
 
 
 def main():
     print("=" * 50)
     print("BeautiFi WiFi Boot Check")
     print("=" * 50)
+
+    # Ensure NetworkManager manages wlan0 for station mode
+    run_cmd("nmcli dev set wlan0 managed yes")
 
     # Wait for NetworkManager to be ready
     print("[WIFI] Waiting for NetworkManager...")

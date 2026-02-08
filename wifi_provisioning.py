@@ -44,9 +44,16 @@ class WiFiProvisioning:
         self.ap_password = ap_password or self.DEFAULT_AP_PASSWORD
         self._ap_active = False
         self._interface = self._get_wifi_interface()
+        self._ap_interface = "uap0"
 
-        print(f"[WIFI] Provisioning initialized")
-        print(f"[WIFI] Interface: {self._interface}")
+        # Connection state tracking for frontend polling
+        self._connection_state = "idle"  # idle | connecting | connected | failed
+        self._connection_error = None
+        self._connection_ip = None
+        self._connection_ssid = None
+
+        print(f"[WIFI] Provisioning initialized (AP+STA concurrent mode)")
+        print(f"[WIFI] Station interface: {self._interface}, AP interface: {self._ap_interface}")
 
     def _run_command(self, cmd: List[str], timeout: int = 30) -> Tuple[bool, str]:
         """Run a shell command and return success status and output."""
@@ -105,12 +112,15 @@ class WiFiProvisioning:
         return None
 
     def get_ip_address(self) -> Optional[str]:
-        """Get the current IP address."""
+        """Get the station IP address (excludes AP interface IP)."""
         success, output = self._run_command([
             "hostname", "-I"
         ])
         if success and output:
-            return output.split()[0]
+            for ip in output.split():
+                # Filter out the AP subnet IP
+                if not ip.startswith("192.168.4."):
+                    return ip
         return None
 
     def has_saved_networks(self) -> bool:
@@ -170,51 +180,62 @@ class WiFiProvisioning:
 
     def start_ap_mode(self) -> Tuple[bool, str]:
         """
-        Start the device in Access Point (hotspot) mode using hostapd.
+        Start AP mode on uap0 virtual interface (concurrent AP+STA).
+        wlan0 remains available for station mode via NetworkManager.
 
         Returns:
             Tuple of (success, message)
         """
-        print(f"[WIFI] Starting AP mode: {self.ap_ssid}")
+        print(f"[WIFI] Starting concurrent AP mode: {self.ap_ssid}")
 
-        # Stop any existing hotspot
+        # Stop any existing AP
         self.stop_ap_mode()
 
-        # Tell NetworkManager to stop managing wlan0
-        self._run_shell("sudo nmcli dev set wlan0 managed no")
+        # Remove stale uap0 if it exists (idempotent)
+        self._run_shell("sudo iw dev uap0 del")
+        time.sleep(0.5)
+
+        # Create virtual AP interface from wlan0
+        success, output = self._run_shell("sudo iw dev wlan0 interface add uap0 type __ap")
+        if not success:
+            print(f"[WIFI] Failed to create uap0: {output}")
+            return False, f"Failed to create virtual AP interface: {output}"
         time.sleep(1)
 
-        # Set up the interface with static IP
-        self._run_shell("sudo ip addr flush dev wlan0")
-        self._run_shell(f"sudo ip addr add {self.DEFAULT_AP_IP}/24 dev wlan0")
-        self._run_shell("sudo ip link set wlan0 up")
+        # Configure uap0 with static IP
+        self._run_shell("sudo ip addr flush dev uap0")
+        self._run_shell(f"sudo ip addr add {self.DEFAULT_AP_IP}/24 dev uap0")
+        self._run_shell("sudo ip link set uap0 up")
         time.sleep(1)
 
-        # Start hostapd and dnsmasq
+        # Ensure wlan0 stays managed by NetworkManager for station mode
+        self._run_shell("sudo nmcli dev set wlan0 managed yes")
+
+        # Start hostapd and dnsmasq (both configured for uap0)
         success1, out1 = self._run_shell("sudo systemctl start hostapd")
         success2, out2 = self._run_shell("sudo systemctl start dnsmasq")
 
         if success1 and success2:
             self._ap_active = True
-            print(f"[WIFI] AP mode started: {self.ap_ssid}")
-            print(f"[WIFI] Connect to this network and go to http://{self.DEFAULT_AP_IP}:5000")
-            return True, f"AP started: {self.ap_ssid}"
+            print(f"[WIFI] AP mode started on uap0: {self.ap_ssid}")
+            print(f"[WIFI] Station mode available on wlan0")
+            return True, f"AP started: {self.ap_ssid} (concurrent mode)"
         else:
             print(f"[WIFI] Failed to start AP: {out1} {out2}")
             return False, f"Failed to start AP: {out1} {out2}"
 
     def stop_ap_mode(self) -> Tuple[bool, str]:
-        """Stop AP mode (hostapd) and return wlan0 to NetworkManager."""
+        """Stop AP mode and remove uap0 virtual interface."""
         print("[WIFI] Stopping AP mode...")
 
         # Stop hostapd and dnsmasq
         self._run_shell("sudo systemctl stop hostapd")
         self._run_shell("sudo systemctl stop dnsmasq")
 
-        # Clear interface and return to NetworkManager
-        self._run_shell("sudo ip addr flush dev wlan0")
-        self._run_shell("sudo nmcli dev set wlan0 managed yes")
-        time.sleep(2)
+        # Remove virtual AP interface
+        self._run_shell("sudo ip link set uap0 down")
+        self._run_shell("sudo iw dev uap0 del")
+        time.sleep(1)
 
         self._ap_active = False
         return True, "AP stopped"
@@ -230,7 +251,8 @@ class WiFiProvisioning:
 
     def connect_to_wifi(self, ssid: str, password: str) -> Tuple[bool, str]:
         """
-        Connect to a WiFi network.
+        Connect to a WiFi network on wlan0 while AP stays active on uap0.
+        Does NOT stop the AP -- concurrent AP+STA mode.
 
         Args:
             ssid: Network SSID
@@ -239,19 +261,19 @@ class WiFiProvisioning:
         Returns:
             Tuple of (success, message)
         """
-        print(f"[WIFI] Connecting to: {ssid}")
+        print(f"[WIFI] Connecting to: {ssid} (AP stays active on uap0)")
 
-        # Stop AP mode if active (hostapd)
-        if self._ap_active or self.is_ap_active():
-            print("[WIFI] Stopping AP mode...")
-            self.stop_ap_mode()
-            time.sleep(3)
+        # Update connection state for frontend polling
+        self._connection_state = "connecting"
+        self._connection_error = None
+        self._connection_ip = None
+        self._connection_ssid = ssid
 
-        # Make sure NetworkManager is managing wlan0
+        # Ensure NetworkManager is managing wlan0
         self._run_shell("sudo nmcli dev set wlan0 managed yes")
         time.sleep(2)
 
-        # Try to connect
+        # Connect via NetworkManager on wlan0 (AP stays on uap0)
         success, output = self._run_shell(
             f'sudo nmcli dev wifi connect "{ssid}" password "{password}" ifname {self._interface}',
             timeout=60
@@ -271,10 +293,54 @@ class WiFiProvisioning:
             time.sleep(2)
             ip = self.get_ip_address()
             print(f"[WIFI] Connected to {ssid}, IP: {ip}, Hostname: {hostname}")
+            self._connection_state = "connected"
+            self._connection_ip = ip
             return True, f"Connected to {ssid}. IP: {ip}"
         else:
-            print(f"[WIFI] Failed to connect: {output}")
-            return False, f"Failed to connect: {output}"
+            error_msg = self._parse_nmcli_error(output)
+            print(f"[WIFI] Failed to connect: {error_msg}")
+            self._connection_state = "failed"
+            self._connection_error = error_msg
+            return False, f"Failed to connect: {error_msg}"
+
+    def _parse_nmcli_error(self, output: str) -> str:
+        """Parse nmcli error output into user-friendly message."""
+        output_lower = output.lower()
+        if "secrets were required" in output_lower or "no secrets" in output_lower:
+            return "Incorrect password"
+        elif "no network with ssid" in output_lower:
+            return "Network not found"
+        elif "timeout" in output_lower:
+            return "Connection timed out"
+        elif "no suitable" in output_lower:
+            return "Network not available"
+        else:
+            return output.strip()[:200]
+
+    def get_connection_state(self) -> Dict:
+        """Get current connection attempt state (for frontend polling)."""
+        return {
+            "state": self._connection_state,
+            "ssid": self._connection_ssid,
+            "ip": self._connection_ip,
+            "error": self._connection_error,
+            "ap_active": self.is_ap_active(),
+        }
+
+    def schedule_ap_shutdown(self, delay_seconds: int = 60):
+        """Schedule AP shutdown after successful WiFi connection."""
+        import threading
+
+        def _delayed_shutdown():
+            print(f"[WIFI] AP will shut down in {delay_seconds} seconds...")
+            time.sleep(delay_seconds)
+            if self._connection_state == "connected":
+                print("[WIFI] Shutting down AP after successful connection")
+                self.stop_ap_mode()
+            else:
+                print("[WIFI] AP shutdown cancelled (connection state changed)")
+
+        threading.Thread(target=_delayed_shutdown, daemon=True).start()
 
     def disconnect(self) -> Tuple[bool, str]:
         """Disconnect from current WiFi network."""
@@ -344,7 +410,9 @@ class WiFiProvisioning:
             "ap_active": self.is_ap_active(),
             "ap_ssid": self.ap_ssid,
             "interface": self._interface,
+            "ap_interface": self._ap_interface,
             "hostname": socket.gethostname(),
+            "connection_state": self._connection_state,
         }
 
 

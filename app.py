@@ -337,7 +337,7 @@ def wifi_scan():
 
 @app.route('/api/wifi/connect', methods=['POST'])
 def wifi_connect():
-    """Connect to a WiFi network."""
+    """Start WiFi connection attempt (non-blocking, AP stays active on uap0)."""
     data = request.get_json() or {}
     ssid = data.get('ssid') or request.form.get('ssid')
     password = data.get('password') or request.form.get('password')
@@ -347,28 +347,38 @@ def wifi_connect():
 
     if wifi_provisioner is None:
         return jsonify({
-            'success': True,
+            'status': 'connected',
             'message': 'Simulated connection (not on Pi)',
             'simulation': True
         })
 
-    # Start connection attempt in background thread AFTER responding
-    # This prevents the "load failed" error when AP mode stops
+    # Start connection in background thread (AP stays active on uap0)
     import threading
-    def delayed_connect():
-        time.sleep(2)  # Wait for response to be sent
-        wifi_provisioner.connect_to_wifi(ssid, password)
+    def _background_connect():
+        success, message = wifi_provisioner.connect_to_wifi(ssid, password)
+        if success:
+            # Schedule AP shutdown after 60 seconds
+            wifi_provisioner.schedule_ap_shutdown(delay_seconds=60)
 
-    threading.Thread(target=delayed_connect, daemon=True).start()
+    threading.Thread(target=_background_connect, daemon=True).start()
 
-    # Respond immediately before AP stops
-    import socket
     return jsonify({
-        'success': True,
-        'message': f'Connecting to {ssid}... The hotspot will disconnect.',
-        'connecting': True,
-        'hostname': socket.gethostname()
+        'status': 'connecting',
+        'message': f'Connecting to {ssid}...',
+        'ssid': ssid,
     })
+
+
+@app.route('/api/wifi/connect-status', methods=['GET'])
+def wifi_connect_status():
+    """Poll connection attempt status (used by frontend during provisioning)."""
+    if wifi_provisioner is None:
+        return jsonify({
+            'state': 'connected',
+            'simulation': True,
+        })
+
+    return jsonify(wifi_provisioner.get_connection_state())
 
 
 @app.route('/api/wifi/ap/start', methods=['POST'])
