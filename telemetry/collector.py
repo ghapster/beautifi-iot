@@ -636,6 +636,9 @@ class TelemetryCollector:
 
                 # Add local network IP for dashboard discovery
                 sample["local_ip"] = self._get_local_ip()
+                # Report firmware version for remote OTA verification
+                from config import FIRMWARE_VERSION
+                sample["firmware_version"] = FIRMWARE_VERSION
 
                 # Check for anomalies before signing
                 anomaly_flags = []
