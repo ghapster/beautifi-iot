@@ -221,14 +221,19 @@ Pi powered via DROK 5V USB output
 - `GET /api/registration/status` - Commissioning state
 - `GET /api/system/status` - Full system status
 
-## WiFi Provisioning Flow
+## WiFi Provisioning Flow (AP+STA Concurrent Mode, v0.6.0+)
 
 1. Pi boots, `wifi_boot.py` runs
-2. If no WiFi configured → starts AP mode
-3. AP SSID: `BeautiFi-Setup`, Password: `beautifi123`
+2. If no WiFi configured → creates `uap0` virtual AP interface on top of `wlan0`
+3. AP SSID: `BeautiFi-Setup`, Password: `beautifi123` (served on `uap0`)
 4. User connects, opens `http://192.168.4.1:5000`
-5. User selects network, enters password
-6. Pi connects to WiFi, AP stops
+5. User enters WiFi name + password
+6. Pi connects to WiFi on `wlan0` while AP stays active on `uap0`
+7. Setup page polls `/api/wifi/connect-status` every 2s for live feedback
+8. On success: shows IP + clickable dashboard link; AP shuts down after 60s
+9. On failure: shows user-friendly error, allows retry
+
+**Key architecture:** BCM43438 single radio supports concurrent AP+STA via virtual interface. Both `uap0` (AP) and `wlan0` (station) share the same channel. `hostapd.conf` and `dnsmasq-hotspot.conf` bind to `uap0`. NetworkManager ignores `uap0` via `/etc/NetworkManager/conf.d/unmanaged-uap0.conf`.
 
 ## Running the Device
 
@@ -545,13 +550,15 @@ Set up end-to-end OTA firmware delivery:
 | **v0.4.0** | Auto-fix avahi IPv6 on startup (`use-ipv6=no`), self-healing mDNS | [GitHub Release](https://github.com/ghapster/beautifi-iot/releases/tag/v0.4.0) |
 | **v0.4.1** | Fix AAAA record publishing (`publish-aaaa-on-ipv4=no`), always restart avahi-daemon on boot | [GitHub Release](https://github.com/ghapster/beautifi-iot/releases/tag/v0.4.1) |
 | **v0.5.0** | Report local network IP in telemetry for miner dashboard "Local Access" link | [GitHub Release](https://github.com/ghapster/beautifi-iot/releases/tag/v0.5.0) |
+| **v0.6.0** | AP+STA concurrent WiFi provisioning with live status feedback; firmware version telemetry reporting | [GitHub Release](https://github.com/ghapster/beautifi-iot/releases/tag/v0.6.0) |
 
-**Current firmware version: v0.5.0**
+**Current firmware version: v0.6.0**
 
 **OTA Flow (verified working):**
 - Manifest at: `https://raw.githubusercontent.com/ghapster/beautifi-iot/main/releases/latest.json`
 - `master` branch kept in sync with `main` for backwards compatibility (v0.2.0 devices check `/master/`)
-- IoT #1 and #2 successfully auto-updated through v0.2.0 → v0.3.0 → v0.4.0 → v0.4.1 → v0.5.0 via OTA
+- IoT #1 and #2 successfully auto-updated through v0.2.0 → v0.3.0 → v0.4.0 → v0.4.1 → v0.5.0 → v0.6.0 via OTA
+- IoT #3 updated to v0.6.0 via OTA (offsite device)
 
 **To publish a new OTA release:**
 1. Bump `FIRMWARE_VERSION` in `config.py`
@@ -593,9 +600,9 @@ Set up end-to-end OTA firmware delivery:
 **Device avahi status (all fixed):**
 | Device | Firmware | avahi Fix | Method |
 |--------|----------|----------|--------|
-| IoT #1 (beautifi-1) | v0.5.0 | ✅ | OTA (self-healed on startup) |
-| IoT #2 (beautifi-2) | v0.5.0 | ✅ | OTA (self-healed on startup) |
-| IoT #3 (beautifi-3) | v0.2.0 | Pending | Will self-fix via OTA when powered on |
+| IoT #1 (beautifi-1) | v0.6.0 | ✅ | OTA (self-healed on startup) |
+| IoT #2 (beautifi-2) | v0.6.0 | ✅ | OTA (self-healed on startup) |
+| IoT #3 (beautifi-3) | v0.6.0 | ✅ | OTA (self-healed on startup) |
 | IoT #4 (beautifi-4) | Unknown | Pending | Will self-fix via OTA when powered on |
 
 #### Fan Dashboard - Local Network Only (v0.3.0)
@@ -649,17 +656,88 @@ IoT (every 12s) → POST /api/telemetry/stream {local_ip: "192.168.0.134"}
 | salonsafe-vite | `src/components/MinerDashboard.jsx` | Thread `local_ip` through to device objects |
 | salonsafe-vite | `src/components/DeviceDetailPanel.jsx` | Render clickable Local Access link |
 
-#### Current Device Status (Feb 7, 2026)
+#### Current Device Status (Feb 8, 2026)
 
 | Device | Hostname | IP | Device ID | Firmware | Network | Status |
 |--------|----------|----|-----------|----------|---------|--------|
-| IoT #1 | beautifi-1 | 192.168.0.151 | btfi-e8a6eb4a363fe54e | v0.5.0 | Local | ✅ Operational |
-| IoT #2 | beautifi-2 | 192.168.0.134 | btfi-9c5263e883ee1b97 | v0.5.0 | Local | ✅ Operational |
-| IoT #3 | beautifi-3 | 192.168.1.165 | btfi-5e93d18822a826b3 | v0.2.0 | Offsite | ⏳ Awaiting OTA v0.5.0 |
-| IoT #4 | beautifi-4 | 192.168.0.119 | btfi-49311ccf334d9d45 | Unknown | Offline | ⏳ Awaiting OTA v0.5.0 |
+| IoT #1 | beautifi-1 | 192.168.0.151 | btfi-e8a6eb4a363fe54e | v0.6.0 | Local | ✅ Operational |
+| IoT #2 | beautifi-2 | 192.168.0.134 | btfi-9c5263e883ee1b97 | v0.6.0 | Local | ✅ Operational |
+| IoT #3 | beautifi-3 | 192.168.1.165 | btfi-5e93d18822a826b3 | v0.6.0 | Offsite | ✅ Operational |
+| IoT #4 | beautifi-4 | 192.168.0.119 | btfi-49311ccf334d9d45 | Unknown | Offline | ⏳ Awaiting OTA |
+
+### Session Notes (Feb 8, 2026)
+
+#### v0.6.0: AP+STA Concurrent WiFi Provisioning
+**Problem:** When entering WiFi credentials during device setup, the hotspot shut down immediately and the user's phone disconnected. Zero feedback on whether connection succeeded or failed — the setup page just went dead.
+
+**Solution:** AP+STA concurrent mode using Pi 3B BCM43438's virtual interface support.
+
+**Architecture:**
+```
+                    BCM43438 (single radio)
+                    ┌──────────────────────┐
+  wlan0 (station) ──┤                      ├── Connected to home WiFi
+                    │  Same channel forced  │
+  uap0 (virtual AP)┤                      ├── Hotspot: BeautiFi-Setup
+                    └──────────────────────┘
+```
+
+**Key implementation details:**
+- `iw dev wlan0 interface add uap0 type __ap` creates virtual AP interface
+- `hostapd.conf` and `dnsmasq-hotspot.conf` bind to `uap0` (not wlan0)
+- NetworkManager ignores `uap0` via `/etc/NetworkManager/conf.d/unmanaged-uap0.conf`
+- `wlan0` stays managed by NetworkManager for station (client) mode
+- Both interfaces MUST share the same channel (hardware constraint)
+- `iw` binary is at `/usr/sbin/iw` on Pi OS (not in default user PATH, works with `sudo`)
+
+**Connection state machine:**
+```
+idle → connecting → connected (AP shutdown in 60s)
+                  → failed (retry available)
+```
+
+**Files changed (8 files):**
+| File | Change |
+|------|--------|
+| `hostapd.conf` | `interface=wlan0` → `interface=uap0` |
+| `dnsmasq-hotspot.conf` | `interface=wlan0` → `interface=uap0` |
+| `wifi_boot.py` | Create/destroy uap0, assign 192.168.4.1/24 |
+| `wifi_provisioning.py` | AP+STA mode, connection state tracking, scheduled AP shutdown, nmcli error parsing |
+| `app.py` | Refactored `/api/wifi/connect`, added `/api/wifi/connect-status` polling endpoint |
+| `templates/index.html` | Live polling UI with animated connection feedback |
+| `setup-new-device.sh` | NetworkManager unmanaged-uap0.conf config |
+| `config.py` | `FIRMWARE_VERSION = "0.6.0"` |
+
+**New API endpoint:**
+- `GET /api/wifi/connect-status` — Returns `{state, ssid, ip, error, ap_active}` for frontend polling
+
+**wifi_provisioning.py new methods:**
+- `get_connection_state()` — Returns connection progress dict
+- `schedule_ap_shutdown(delay=60)` — Background thread stops AP after successful connection
+- `_parse_nmcli_error(output)` — Converts nmcli errors to user-friendly messages
+
+**Testing:** Verified on IoT #1 — both `wlan0` (connected to WiFi) and `uap0` (serving hotspot) run simultaneously. Phone stays connected to BeautiFi-Setup throughout the connection process.
+
+#### Firmware Version Telemetry Reporting
+**Problem:** After OTA updates, no way to remotely verify what firmware version a device is running. Backend API showed stale/unknown firmware versions.
+
+**Solution:** Devices include `firmware_version` in every telemetry sample.
+
+**Files changed:**
+| Repo | File | Change |
+|------|------|--------|
+| beautifi-iot | `telemetry/collector.py` | `sample["firmware_version"] = FIRMWARE_VERSION` |
+| salon-safe-backend | `routes/telemetry.js` | Extract `firmwareVersion`, store with `COALESCE($4, firmware_version)` in UPDATE |
+| salon-safe-backend | `routes/telemetry.js` | Return `firmware_version` in device status API |
+
+**Note:** IoT #3 received v0.6.0 via OTA before firmware_version reporting was added to collector.py (the ZIP was rebuilt after initial release). IoT #3 will get firmware_version reporting with v0.7.0. IoT #1 and #2 were manually updated via `git pull` and report correctly.
+
+#### OTA Timing Lesson Learned
+When rebuilding a release ZIP after the version was already published, devices that already downloaded the first ZIP won't re-download (same version number). Always include ALL changes before creating the release, or bump the version number. IoT #3 was affected by this — got v0.6.0 code without the firmware_version telemetry addition.
 
 ### Known Issues / TODO
-- **WiFi Provisioning UI** (Low Priority): The setup interface at `192.168.4.1:5000` is functional but not polished. Network scanning doesn't work in AP mode (hardware limitation - wlan0 can't scan while running hostapd). Manual SSID entry works correctly. Needs UI/UX improvements after IoT testing is complete.
+- **WiFi Network Scanning** (Low Priority): Network scanning is not available during AP mode (hardware limitation — wlan0 is used by the virtual AP interface). Manual SSID entry works correctly.
+- **IoT #3 firmware_version telemetry**: Reports 0.2.0 in backend because it received v0.6.0 ZIP before firmware_version reporting was added. Will be fixed with v0.7.0.
 - **Static IPs**: Consider setting static DHCP reservations on the router for all Pis so hosts file entries and bookmarks remain valid.
 - **OTA Signature Verification**: Currently logs `WARNING: No trusted public key configured`. Low priority for prototyping but needed before production.
 

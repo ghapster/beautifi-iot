@@ -42,7 +42,7 @@ This installs everything:
 - Sets up systemd services
 - Auto-generates unique Ed25519 device identity
 
-### 3. WiFi Provisioning (AP Mode)
+### 3. WiFi Provisioning (AP+STA Concurrent Mode, v0.6.0+)
 
 If no WiFi is pre-configured, the device automatically enters AP mode on boot:
 
@@ -50,9 +50,12 @@ If no WiFi is pre-configured, the device automatically enters AP mode on boot:
 2. Password: **beautifi123**
 3. Open browser: **http://192.168.4.1:5000**
 4. Enter your WiFi credentials manually (scanning not available in AP mode)
-5. Device connects and hotspot disappears
+5. **Live status feedback** — the setup page shows connection progress in real-time
+6. On success: shows your device's IP address with a clickable dashboard link
+7. On failure: shows a clear error message (wrong password, network not found, etc.)
+8. Hotspot stays active for 60 seconds after successful connection, then shuts down
 
-> **Note:** The WiFi provisioning UI is functional but needs polish. Network scanning is not available while in AP mode. This is a known limitation - manual SSID entry works correctly.
+> **How it works:** The Pi uses AP+STA concurrent mode — a virtual `uap0` interface runs the hotspot while `wlan0` connects to your WiFi. Both run simultaneously on the BCM43438's single radio (same channel). This means the setup page stays accessible throughout the entire connection process, giving real-time feedback instead of going dead.
 
 ### 4. Access Your Device (mDNS)
 
@@ -83,7 +86,7 @@ Each device self-reports its local IP in telemetry every 12 seconds, so the dash
 - **Evidence Packs**: Hourly epoch bundles uploaded to Cloudflare R2
 - **Backend Integration**: Auto-submission to verifier API with token rewards
 - **Remote Control**: Dashboard can toggle fans and set speed (50%/100%)
-- **WiFi Provisioning**: AP mode fallback for initial setup
+- **WiFi Provisioning**: AP+STA concurrent mode with live connection status feedback
 - **Anomaly Detection**: Statistical outlier and tamper detection
 - **Local IP Reporting**: Self-reports LAN IP in telemetry for miner dashboard access link
 
@@ -128,6 +131,7 @@ curl -X POST http://<IP>:5000/api/fan -H "Content-Type: application/json" -d '{"
 | `/api/fan` | POST | Set fan speed `{"speed": 0-100}` |
 | `/api/wifi/status` | GET | WiFi connection status |
 | `/api/wifi/connect` | POST | Connect to network |
+| `/api/wifi/connect-status` | GET | Connection progress polling |
 | `/api/telemetry/samples` | GET | Recent sensor readings |
 | `/api/registration/status` | GET | Commissioning state |
 | `/api/system/status` | GET | Full system status |
@@ -284,14 +288,12 @@ Returns all discoverable devices:
 
 ## Prototype Devices (Feb 2026)
 
-| Device | Hostname | Device ID | Status |
-|--------|----------|-----------|--------|
 | Device | Hostname | Device ID | Firmware | Status |
 |--------|----------|-----------|----------|--------|
-| IoT #1 | beautifi-1 | btfi-e8a6eb4a363fe54e | v0.5.0 | ✅ Operational |
-| IoT #2 | beautifi-2 | btfi-9c5263e883ee1b97 | v0.5.0 | ✅ Operational |
-| IoT #3 | beautifi-3 | btfi-5e93d18822a826b3 | v0.2.0 | ⏳ Awaiting OTA |
-| IoT #4 | beautifi-4 | btfi-49311ccf334d9d45 | Unknown | ⏳ Awaiting OTA |
+| IoT #1 | beautifi-1 | btfi-e8a6eb4a363fe54e | v0.6.0 | ✅ Operational |
+| IoT #2 | beautifi-2 | btfi-9c5263e883ee1b97 | v0.6.0 | ✅ Operational |
+| IoT #3 | beautifi-3 | btfi-5e93d18822a826b3 | v0.6.0 | ✅ Operational (offsite) |
+| IoT #4 | beautifi-4 | btfi-49311ccf334d9d45 | Unknown | ⏳ Offline |
 
 All prototype devices have:
 - WiFi AP mode provisioning configured and tested (hostapd/dnsmasq)
@@ -321,7 +323,7 @@ The red wire is a **power OUTPUT** from the fan's internal controller (meant for
 
 ## Known Issues / TODO
 
-- [ ] **WiFi Provisioning UI** (Low Priority): The setup interface at `192.168.4.1:5000` is functional but not polished. Network scanning doesn't work in AP mode (hardware limitation). Manual SSID entry works. Needs UI/UX improvements after IoT testing is complete.
+- [ ] **WiFi Network Scanning** (Low Priority): Network scanning is not available during AP mode (hardware limitation — wlan0 is used by the virtual AP interface). Manual SSID entry works correctly. Users must type their WiFi network name.
 
 ## Related Projects
 
@@ -339,9 +341,10 @@ See `CLAUDE.md` for detailed architecture, wiring diagrams, and implementation n
 
 | Version | Date | Changes |
 |---------|------|---------|
+| v0.6.0 | Feb 8, 2026 | AP+STA concurrent WiFi provisioning with live status feedback; firmware version telemetry reporting |
 | v0.5.0 | Feb 7, 2026 | Report local IP in telemetry for miner dashboard Local Access link |
 | v0.4.1 | Feb 7, 2026 | Fix AAAA record publishing, always restart avahi on boot |
 | v0.4.0 | Feb 7, 2026 | Auto-fix avahi IPv6 on startup |
 | v0.3.0 | Feb 6, 2026 | Hide off-network devices from fan dashboard, fix OTA manifest URL |
 
-*Last Updated: February 7, 2026 (Firmware v0.5.0 - Local Access IP link)*
+*Last Updated: February 8, 2026 (Firmware v0.6.0 - AP+STA concurrent WiFi provisioning)*
