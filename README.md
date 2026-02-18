@@ -7,7 +7,7 @@ IoT component for the BeautiFi/DUAN ecosystem. Controls ventilation fans, collec
 | Phase | Feature | Status |
 |-------|---------|--------|
 | 0 | Fan Control MVP | Done |
-| 1 | Sensor Integration | Done (Simulation) |
+| 1 | Sensor Integration | Done (BME680 real on IoT #1, simulated on others) |
 | 2 | Telemetry Collection | Done |
 | 3 | Device Identity & Ed25519 Signing | Done |
 | 4 | Epoch Formation with Merkle Trees | Done |
@@ -97,14 +97,28 @@ Each device self-reports its local IP in telemetry every 12 seconds, so the dash
 - SN74 Logic Buffer (PWM signal conditioning)
 - PWM-to-0-10V Converter modules
 - DROK 12V-5V Buck Converter
+- Waveshare IU-BME680 Environmental Sensor (IoT #1 only, I2C address **0x77**)
 
-### GPIO Pins
+### GPIO Pins — Fan PWM
 
-| Fan | GPIO Pin |
-|-----|----------|
-| Fan 1 | 18 |
-| Fan 2 | 13 |
-| Fan 3 | 19 |
+| Fan | GPIO Pin | Physical Pin |
+|-----|----------|-------------|
+| Fan 1 | GPIO 18 | Pin 12 |
+| Fan 2 | GPIO 13 | Pin 33 |
+| Fan 3 | GPIO 19 | Pin 35 |
+
+### GPIO Pins — BME680 Sensor (IoT #1 only)
+
+| Pi Pin | Function | Wire Color | BME680 Pin |
+|--------|----------|------------|------------|
+| Pin 1  | 3.3V     | Red        | VCC        |
+| Pin 3  | SDA (GPIO 2) | Blue   | SDA/MOSI   |
+| Pin 5  | SCL (GPIO 3) | White  | SCL/SCK    |
+| Pin 25 | GND      | Black      | GND        |
+
+Default I2C address: **0x77** (configurable to 0x76 by shorting ADDR pad on the board).
+Disconnected wires: Green (CS), Orange (ADDR/MISO) — not needed for I2C mode.
+Software: `sensors/bme680_reader.py` — activated when `SIMULATION_MODE = False` in `config.py`.
 
 ## Useful Commands
 
@@ -290,7 +304,7 @@ Returns all discoverable devices:
 
 | Device | Hostname | Device ID | Firmware | Status |
 |--------|----------|-----------|----------|--------|
-| IoT #1 | beautifi-1 | btfi-e8a6eb4a363fe54e | v0.6.0 | ✅ Operational |
+| IoT #1 | beautifi-1 | btfi-e8a6eb4a363fe54e | v0.6.0 | ✅ Operational (BME680 real sensor) |
 | IoT #2 | beautifi-2 | btfi-9c5263e883ee1b97 | v0.6.0 | ✅ Operational |
 | IoT #3 | beautifi-3 | btfi-5e93d18822a826b3 | v0.6.0 | ✅ Operational (offsite) |
 | IoT #4 | beautifi-4 | btfi-49311ccf334d9d45 | Unknown | ⏳ Offline |
@@ -324,6 +338,7 @@ The red wire is a **power OUTPUT** from the fan's internal controller (meant for
 ## Known Issues / TODO
 
 - [ ] **WiFi Network Scanning** (Low Priority): Network scanning is not available during AP mode (hardware limitation — wlan0 is used by the virtual AP interface). Manual SSID entry works correctly. Users must type their WiFi network name.
+- [ ] **Roll out BME680 to other devices**: IoT #1 has a real BME680 sensor wired in and reporting real data. Once validated, wire BME680 sensors into IoT #2, #3, #4 and set `SIMULATION_MODE = False` on each.
 
 ## Related Projects
 
@@ -347,4 +362,24 @@ See `CLAUDE.md` for detailed architecture, wiring diagrams, and implementation n
 | v0.4.0 | Feb 7, 2026 | Auto-fix avahi IPv6 on startup |
 | v0.3.0 | Feb 6, 2026 | Hide off-network devices from fan dashboard, fix OTA manifest URL |
 
-*Last Updated: February 8, 2026 (Firmware v0.6.0 - AP+STA concurrent WiFi provisioning)*
+### Session Notes (Feb 18, 2026)
+
+#### BME680 Real Sensor Integration (IoT #1)
+Wired a Waveshare IU-BME680 environmental sensor to IoT #1 (beautifi-1) via I2C. This is the first real sensor on any BeautiFi IoT device — all previous telemetry was simulated.
+
+**What the BME680 measures (real):** Temperature, humidity, barometric pressure, gas resistance (VOC indicator)
+**What is estimated from gas resistance:** VOC ppb (via rolling baseline), CO2 ppm, PM2.5 (BME680 does not measure these directly)
+
+**Changes made directly on IoT #1 (not via OTA):**
+1. Installed `bme680` Python library
+2. Created `sensors/bme680_reader.py` — same `read_all()` interface as `SimulatedSensors`
+3. Patched `telemetry/collector.py` — uses `BME680Sensors` when `SIMULATION_MODE = False`, falls back to simulator if sensor init fails
+4. Set `SIMULATION_MODE = False` in `config.py`
+
+**Wiring notes:**
+- Pin 25 used for GND instead of Pin 9 (Pin 9 taken by SN74 buffer OE1)
+- White wire = SCL (not yellow as initially assumed from harness colors)
+- I2C must be enabled on Pi: `sudo raspi-config nonint do_i2c 0`
+- Verify sensor detection: `sudo i2cdetect -y 1` (should show `77`)
+
+*Last Updated: February 18, 2026 (BME680 real sensor on IoT #1)*
