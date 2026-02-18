@@ -382,4 +382,78 @@ Wired a Waveshare IU-BME680 environmental sensor to IoT #1 (beautifi-1) via I2C.
 - I2C must be enabled on Pi: `sudo raspi-config nonint do_i2c 0`
 - Verify sensor detection: `sudo i2cdetect -y 1` (should show `77`)
 
-*Last Updated: February 18, 2026 (BME680 real sensor on IoT #1)*
+#### Real Sensor Validation Tests (IoT #1)
+Ran live tests with the BME680 sensor to validate real-world readings:
+
+**Nail polish remover VOC test:**
+- Baseline (fan on 50%, clean air): ~40 ppb
+- Peak with open bottle near sensor: ~216 ppb
+- Recovery after bottle removed: returned to baseline within minutes
+
+**Fan vs no-fan VOC comparison:**
+- Fan OFF: VOC climbed from 63.4 → 73.4 ppb, with occasional spikes to 95 ppb
+- Fan ON at 100%: VOC ~74.7-83.6 ppb (no improvement because fan is not connected to ductwork/filter — just recirculating room air)
+- Fan ON at 50%, normal operation: ~63-73 ppb
+
+**Key insight:** Fan speed only affects VOC when ducted through a carbon filter. Without ductwork, the fan just recirculates ambient air and VOC readings stay flat regardless of speed.
+
+#### Dashboard Expanded Health Cards (salonsafe-vite)
+Added 5 new metric cards to the Health tab, expanding from 5 to 10 cards:
+- **Existing:** Air Cleaning (CFM), VOC Level, Power Draw, Temperature, Humidity
+- **Added:** VOC Reduction %, CO₂ Level, PM2.5, Barometric Pressure, Gas Resistance
+
+Updated `useDeviceTelemetry.js` to extract pressure_hpa, voc_reduction_pct, gas_resistance, and simulation_mode from telemetry payload. Updated VOC reduction threshold from 500 ppb to 5000 ppb (500 was calibrated for simulated data; real nail salons can spike to 4000+ ppb).
+
+#### Device ID Clarification
+Confirmed device ID mapping after initial confusion:
+- IoT #1 (`btfi-e8a6eb4a363fe54e`) at 192.168.0.151 — LOCAL, has BME680, registered to salon
+- IoT #2 (`btfi-9c5263e883ee1b97`) at 192.168.0.134 — LOCAL, simulated sensors, NOT registered
+- IoT #3 (`btfi-5e93d18822a826b3`) at 192.168.1.165 — OFFSITE
+- IoT #4 (`btfi-49311ccf334d9d45`) — OFFLINE
+
+#### Building Pressure Balance Detection — Research
+Investigated whether the IoT system can detect if a building's ventilation is balanced (positive/negative pressure) as a simple YES/NO indicator.
+
+**Tach wire (white wire) on AC Infinity S6 USB-C cable:**
+- The white wire is the **tach (RPM feedback)** signal — already documented but currently left floating/unconnected
+- It's physically present inside the USB-C cable alongside the yellow (VSP) and black (GND) wires
+- EC fan tach outputs are typically open-collector — can connect directly to a Pi GPIO pin with internal pull-up enabled (no external resistors needed)
+- To connect: pick up the white wire's USB-C breakout pin on the Pi side → jumper to a free GPIO pin → enable `GPIO.PUD_UP` in software
+- **Safety step:** Before connecting, use a multimeter to verify the tach wire isn't pushing voltage (measure white-to-black with fan running; should be near 0V or low fluctuating if open-collector)
+
+**Tach is useful for:**
+- Fan health monitoring (bearing wear, motor degradation)
+- Clogged filter detection (RPM drops as filter loads up over weeks)
+- Ductwork blockage detection (sudden RPM drop)
+- Confirming the fan is actually spinning (currently assumed from PWM)
+
+**Tach is NOT useful for building pressure balance:**
+- At any commanded speed, the EC motor controller compensates for back-pressure by drawing more current to maintain RPM
+- Building pressure differentials (2-5 Pa) are tiny compared to duct static pressure (hundreds of Pa)
+- RPM changes from pressure imbalance would be lost in noise
+
+**Recommended approach for pressure balance detection:**
+- **Option A (software only, no hardware):** Compare BME680 indoor barometric pressure against local outdoor pressure from a weather API (e.g., OpenWeatherMap free tier). A persistent offset over 30+ minutes = imbalanced. Zero hardware cost.
+- **Option B (hardware, most reliable):** Add a dedicated differential pressure sensor ($15-25) with a tube to outside. Direct measurement.
+
+---
+
+### ⏸️ STOPPING POINT — February 18, 2026
+
+**Where things stand:**
+- IoT #1 has a real BME680 sensor producing live environmental data (temp, humidity, pressure, VOC)
+- Fan control working on IoT #1 (tested at 0%, 50%, 100%)
+- Dashboard shows 10 health metric cards with live data from IoT #1
+- Salon registration correctly linked to IoT #1 (`btfi-e8a6eb4a363fe54e`)
+- IoT #2 is online and reporting simulated data but NOT registered to any salon
+
+**Next steps when we return:**
+1. **Wire BME680 sensors into IoT #2, #3, #4** — same wiring as IoT #1 (Pin 1=3.3V, Pin 3=SDA, Pin 5=SCL, Pin 25=GND, I2C addr 0x77)
+2. **Connect tach wire (white)** on IoT #1 as proof-of-concept — find USB-C breakout pin, jumper to GPIO 4 (Pin 7), test with multimeter first
+3. **Prototype pressure balance detection** — BME680 vs weather API comparison (Option A, software only)
+4. **Register IoT #2** to the salon once it has a real sensor
+5. **Continue with verify-first signup + registration merge** (plan exists at `C:\Users\CO-OP\.claude\plans\generic-booping-cray.md`)
+
+**Fan is currently OFF on IoT #1.**
+
+*Last Updated: February 18, 2026*
