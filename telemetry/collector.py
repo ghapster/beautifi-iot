@@ -77,6 +77,15 @@ except ImportError as e:
     VERIFIER_AVAILABLE = False
     VerifierClient = None
 
+# Pressure balance imports (with graceful fallback)
+try:
+    from sensors.pressure_balance import PressureBalanceTracker
+    PRESSURE_BALANCE_AVAILABLE = True
+except ImportError as e:
+    print(f"[WARN] Pressure balance module not available: {e}")
+    PRESSURE_BALANCE_AVAILABLE = False
+    PressureBalanceTracker = None
+
 
 class TelemetryCollector:
     """
@@ -185,6 +194,15 @@ class TelemetryCollector:
         else:
             # TODO: Initialize real sensors when available
             self.sensors = SimulatedSensors(self.fan_interpolator)
+
+        # Initialize pressure balance tracker
+        self._pressure_tracker = None
+        if PRESSURE_BALANCE_AVAILABLE:
+            try:
+                self._pressure_tracker = PressureBalanceTracker()
+                print('[PRESSURE] Balance tracker initialized')
+            except Exception as e:
+                print(f'[WARN] Failed to initialize pressure tracker: {e}')
 
         # Local IP cache (refreshed every 60 seconds)
         self._cached_ip = None
@@ -639,6 +657,17 @@ class TelemetryCollector:
                 # Report firmware version for remote OTA verification
                 from config import FIRMWARE_VERSION
                 sample["firmware_version"] = FIRMWARE_VERSION
+
+                # Feed pressure balance tracker
+                if self._pressure_tracker:
+                    try:
+                        pressure_hpa = sample['environment'].get('pressure_hpa') or sample.get('_sensor_state', {}).get('pressure_hpa')
+                        fan_on = current_pwm > 0
+                        if pressure_hpa is not None:
+                            self._pressure_tracker.update(pressure_hpa, fan_on, sample['timestamp'])
+                        sample['_pressure_balance'] = self._pressure_tracker.get_status()
+                    except Exception as e:
+                        print(f'[WARN] Pressure balance error: {e}')
 
                 # Check for anomalies before signing
                 anomaly_flags = []

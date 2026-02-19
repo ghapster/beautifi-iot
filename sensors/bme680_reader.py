@@ -198,6 +198,7 @@ class BME680Sensors:
                 "humidity_pct": humidity,
                 "delta_p_pa": delta_p,
                 "dp_pa": delta_p,
+                "pressure_hpa": pressure_hpa,
             },
 
             # Derived metrics

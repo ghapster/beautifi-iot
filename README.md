@@ -432,9 +432,40 @@ Investigated whether the IoT system can detect if a building's ventilation is ba
 - Building pressure differentials (2-5 Pa) are tiny compared to duct static pressure (hundreds of Pa)
 - RPM changes from pressure imbalance would be lost in noise
 
-**Recommended approach for pressure balance detection:**
-- **Option A (software only, no hardware):** Compare BME680 indoor barometric pressure against local outdoor pressure from a weather API (e.g., OpenWeatherMap free tier). A persistent offset over 30+ minutes = imbalanced. Zero hardware cost.
-- **Option B (hardware, most reliable):** Add a dedicated differential pressure sensor ($15-25) with a tube to outside. Direct measurement.
+**Recommended approach for pressure balance detection — Fan-On vs Fan-Off Delta (no external data needed):**
+
+We control the fan and know when it's ON vs OFF. The BME680 measures barometric pressure in both states. The delta between the two tells us if the building has adequate makeup air:
+
+| Scenario | Fan ON pressure | Fan OFF pressure | Delta | Verdict |
+|----------|----------------|-----------------|-------|---------|
+| Balanced (adequate makeup air) | 1006.0 hPa | 1006.0 hPa | ~0 Pa | BALANCED |
+| Negative pressure (no makeup air) | 1005.7 hPa | 1006.0 hPa | -3 Pa | IMBALANCED |
+
+**Why this works without outdoor weather data:**
+- We're comparing the sensor **against itself** in two known states — absolute accuracy doesn't matter
+- BME680 resolution is 0.18 Pa per reading; sampling every 12 seconds, a 10-minute rolling average easily resolves 2-5 Pa offsets
+- If the exhaust fan creates negative pressure (air leaving faster than entering), BME680 sees a pressure drop during fan-on periods
+- If the building has balanced supply/exhaust, pressure stays the same regardless of fan state
+- Self-calibrating: no API keys, no internet dependency, no external reference
+
+**Algorithm — Transition-based detection using natural business cycles:**
+
+Salons have natural fan cycles: on during business hours, off at night. The device collects 24/7 and detects fan state transitions (off→on, on→off). The transition moments provide the cleanest signal because weather pressure changes are slow (hours) while fan pressure effects are fast (seconds to minutes). An immediate pressure drop when the fan kicks on can only be the fan's doing.
+
+1. Detect fan state transitions (off→on and on→off)
+2. Compare average pressure 10 min before vs 10 min after each transition
+3. Accumulate transition deltas over multiple days
+4. Consistent negative delta on fan-start → **IMBALANCED** (exhaust exceeds makeup air)
+5. No consistent delta → **BALANCED**
+
+The system gets more confident over time — day 1 may report "insufficient data," but after a week of daily on/off cycles it has a solid verdict. If someone installs makeup air or fixes HVAC, the system self-corrects within a few days.
+
+**Why tach/power curves won't work for this:**
+- EC motor controller compensates for back-pressure by drawing more current to maintain RPM
+- Building pressure differentials (2-5 Pa) are negligible vs duct static pressure (hundreds of Pa)
+- We don't measure actual power draw or actual CFM — both are interpolated from PWM duty cycle
+
+**Tach wire is still valuable for other purposes** (see above): fan health, filter clogging, ductwork blockage, spin confirmation.
 
 ---
 
@@ -446,13 +477,15 @@ Investigated whether the IoT system can detect if a building's ventilation is ba
 - Dashboard shows 10 health metric cards with live data from IoT #1
 - Salon registration correctly linked to IoT #1 (`btfi-e8a6eb4a363fe54e`)
 - IoT #2 is online and reporting simulated data but NOT registered to any salon
+- Pressure balance detection approach designed (fan-on vs fan-off BME680 delta) — not yet coded
 
 **Next steps when we return:**
 1. **Wire BME680 sensors into IoT #2, #3, #4** — same wiring as IoT #1 (Pin 1=3.3V, Pin 3=SDA, Pin 5=SCL, Pin 25=GND, I2C addr 0x77)
 2. **Connect tach wire (white)** on IoT #1 as proof-of-concept — find USB-C breakout pin, jumper to GPIO 4 (Pin 7), test with multimeter first
-3. **Prototype pressure balance detection** — BME680 vs weather API comparison (Option A, software only)
+3. **Prototype pressure balance detection** — implement fan-on vs fan-off barometric pressure delta algorithm (software only, no external data needed)
 4. **Register IoT #2** to the salon once it has a real sensor
-5. **Continue with verify-first signup + registration merge** (plan exists at `C:\Users\CO-OP\.claude\plans\generic-booping-cray.md`)
+5. **Prototype Pi HAT** — schematic and BOM in `hardware/beautifi-hat-v1.md`, consolidates breadboard into single PCB
+6. **Continue with verify-first signup + registration merge** (plan exists at `C:\Users\CO-OP\.claude\plans\generic-booping-cray.md`)
 
 **Fan is currently OFF on IoT #1.**
 
