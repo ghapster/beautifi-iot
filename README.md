@@ -469,24 +469,29 @@ The system gets more confident over time — day 1 may report "insufficient data
 
 ---
 
-### ⏸️ STOPPING POINT — February 18, 2026
+### ⏸️ STOPPING POINT — February 19, 2026
 
 **Where things stand:**
 - IoT #1 has a real BME680 sensor producing live environmental data (temp, humidity, pressure, VOC)
 - Fan control working on IoT #1 (tested at 0%, 50%, 100%)
-- Dashboard shows 10 health metric cards with live data from IoT #1
+- Miner dashboard shows 11 health metric cards including Building Balance (was 10)
+- Admin dashboard has Balance column in device table + detail card in telemetry view
+- **Pressure balance detection IMPLEMENTED and TESTED** — transition-based algorithm using fan-on vs fan-off BME680 barometric pressure delta
+  - `sensors/pressure_balance.py` — PressureBalanceTracker class
+  - Integrated into `telemetry/collector.py` — feeds pressure + fan state each sample, includes `_pressure_balance` in telemetry
+  - Backend passes `pressure_balance` through WebSocket to admin dashboard
+  - Live test: 3 transitions completed, status = **BALANCED**, delta = +22.8 Pa, confidence = 30%
+  - Confidence grows with more transitions (30% at 3, 100% at 10+); salon gets ~2 transitions/day from natural business cycles
+- Pi HAT v1 schematic and BOM in `hardware/beautifi-hat-v1.md` — consolidates breadboard into single PCB (~$15/board)
 - Salon registration correctly linked to IoT #1 (`btfi-e8a6eb4a363fe54e`)
 - IoT #2 is online and reporting simulated data but NOT registered to any salon
-- Pressure balance detection approach designed (fan-on vs fan-off BME680 delta) — not yet coded
 
 **Next steps when we return:**
 1. **Wire BME680 sensors into IoT #2, #3, #4** — same wiring as IoT #1 (Pin 1=3.3V, Pin 3=SDA, Pin 5=SCL, Pin 25=GND, I2C addr 0x77)
 2. **Connect tach wire (white)** on IoT #1 as proof-of-concept — find USB-C breakout pin, jumper to GPIO 4 (Pin 7), test with multimeter first
-3. **Prototype pressure balance detection** — implement fan-on vs fan-off barometric pressure delta algorithm (software only, no external data needed)
-4. **Register IoT #2** to the salon once it has a real sensor
-5. **Prototype Pi HAT** — schematic and BOM in `hardware/beautifi-hat-v1.md`, consolidates breadboard into single PCB
-6. **Continue with verify-first signup + registration merge** (plan exists at `C:\Users\CO-OP\.claude\plans\generic-booping-cray.md`)
+3. **Register IoT #2** to the salon once it has a real sensor
+4. **Continue with verify-first signup + registration merge** (plan exists at `C:\Users\CO-OP\.claude\plans\generic-booping-cray.md`)
 
 **Fan is currently OFF on IoT #1.**
 
-*Last Updated: February 18, 2026*
+*Last Updated: February 19, 2026*
