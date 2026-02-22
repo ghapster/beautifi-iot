@@ -23,8 +23,10 @@ IoT component for the BeautiFi/DUAN ecosystem. Controls ventilation fans, collec
 Use Raspberry Pi Imager:
 - Set hostname (e.g., `beautifi-2`, `beautifi-3`, etc.)
 - Enable SSH with password authentication
-- Set username: `pi` with your password
+- Set username: `pi`, password: `raspberry` (default for all prototype devices)
 - Optionally configure WiFi (or use AP mode provisioning)
+
+> **SSH Credentials (all devices):** Username `pi`, Password `raspberry`
 
 ### 2. Run One-Command Setup
 

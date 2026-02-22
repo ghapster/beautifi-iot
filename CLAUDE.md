@@ -33,6 +33,7 @@ When reading the whitepaper, follow all specifications EXCEPT storage infrastruc
 ```bash
 ssh pi@192.168.0.151
 ```
+**Default credentials (all prototype devices):** Username `pi`, Password `raspberry`
 
 The Pi runs at IP `192.168.0.151` on the local network. The IoT code is located at `/home/pi/beautifi-iot` on the Pi.
 
