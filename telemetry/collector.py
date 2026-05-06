@@ -30,7 +30,7 @@ from config import (
     VERIFIER_URL,
     ENABLE_VERIFIER_SYNC,
 )
-from sensors import SimulatedSensors, FanInterpolator
+from sensors import SimulatedSensors, FanInterpolator, _try_bme680_sensors
 
 # Evidence pack imports (with graceful fallback)
 try:
@@ -187,13 +187,30 @@ class TelemetryCollector:
             except Exception as e:
                 print(f"[WARN] Failed to initialize verifier client: {e}")
 
-        # Initialize sensors (simulation or real based on config)
+        # Initialize sensors. With SIMULATION_MODE=False (the default since
+        # all field devices now have BME680 hardware), prefer the real sensor
+        # and only fall back to the simulator if hardware is genuinely absent
+        # (dev workstations without the bme680 library, or wiring failure).
+        # The fallback is deliberately noisy so it doesn't silently mask
+        # missing hardware in production.
         self.fan_interpolator = FanInterpolator()
         if SIMULATION_MODE:
             self.sensors = SimulatedSensors(self.fan_interpolator)
+            print("[SENSORS] SIMULATION_MODE=True; using SimulatedSensors")
         else:
-            # TODO: Initialize real sensors when available
-            self.sensors = SimulatedSensors(self.fan_interpolator)
+            BME680Sensors = _try_bme680_sensors()
+            if BME680Sensors is None:
+                print("[WARN] bme680 library not installed; falling back to SimulatedSensors. "
+                      "On a Pi with BME680 hardware, install with: "
+                      "pip install bme680 --break-system-packages")
+                self.sensors = SimulatedSensors(self.fan_interpolator)
+            else:
+                try:
+                    self.sensors = BME680Sensors(self.fan_interpolator)
+                    print("[SENSORS] Using real BME680 sensor")
+                except Exception as e:
+                    print(f"[WARN] BME680 init failed ({e}); falling back to SimulatedSensors")
+                    self.sensors = SimulatedSensors(self.fan_interpolator)
 
         # Initialize pressure balance tracker
         self._pressure_tracker = None
@@ -657,8 +674,11 @@ class TelemetryCollector:
                 # Report firmware version for remote OTA verification
                 from config import FIRMWARE_VERSION
                 sample["firmware_version"] = FIRMWARE_VERSION
-                # Tag sample with simulation vs real-sensor origin (migration 011)
-                sample["simulation_mode"] = SIMULATION_MODE
+                # Tag sample with simulation vs real-sensor origin (migration 011).
+                # Reflects the actual sensor class in use, not just the config flag —
+                # so a fallback to SimulatedSensors (e.g. BME680 init failed) is
+                # honestly reported as simulation_mode=True even with the flag off.
+                sample["simulation_mode"] = isinstance(self.sensors, SimulatedSensors)
 
                 # Feed pressure balance tracker
                 if self._pressure_tracker:

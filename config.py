@@ -16,9 +16,13 @@ except ImportError:
 # ============================================
 # OPERATION MODE
 # ============================================
-# Set to True for testing with simulated sensors
-# Set to False when real hardware is connected
-SIMULATION_MODE = True
+# All field devices now have real BME680 hardware (May 2026).
+# Default is real sensors; flip to True only for explicit local testing
+# without hardware (e.g. dev workstation without the bme680 library).
+# When False and BME680 init fails, collector.py falls back to the
+# simulator with a noisy warning, and tags samples with simulation_mode=True
+# at the payload level so the backend can distinguish them.
+SIMULATION_MODE = False
 
 # ============================================
 # DEVICE IDENTITY
