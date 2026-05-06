@@ -657,6 +657,8 @@ class TelemetryCollector:
                 # Report firmware version for remote OTA verification
                 from config import FIRMWARE_VERSION
                 sample["firmware_version"] = FIRMWARE_VERSION
+                # Tag sample with simulation vs real-sensor origin (migration 011)
+                sample["simulation_mode"] = SIMULATION_MODE
 
                 # Feed pressure balance tracker
                 if self._pressure_tracker:
