@@ -260,19 +260,24 @@ Pin 9 (closer GND) was unavailable (used by SN74 buffer OE1), so Pin 25 is used 
 - `GET /api/registration/status` - Commissioning state
 - `GET /api/system/status` - Full system status
 
-## WiFi Provisioning Flow (AP+STA Concurrent Mode, v0.6.0+)
+## WiFi Provisioning Flow (AP+STA Concurrent Mode, v0.7.2+)
 
 1. Pi boots, `wifi_boot.py` runs
 2. If no WiFi configured → creates `uap0` virtual AP interface on top of `wlan0`
 3. AP SSID: `BeautiFi-Setup`, Password: `beautifi123` (served on `uap0`)
 4. User connects, opens `http://192.168.4.1:5000`
 5. User enters WiFi name + password
-6. Pi connects to WiFi on `wlan0` while AP stays active on `uap0`
-7. Setup page polls `/api/wifi/connect-status` every 2s for live feedback
-8. On success: shows IP + clickable dashboard link; AP shuts down after 60s
-9. On failure: shows user-friendly error, allows retry
+6. Backend scans the target SSID's channel and updates hostapd to match (so AP+STA can share the radio)
+7. Pi connects to WiFi on `wlan0` while AP stays active on `uap0` on the matched channel
+8. Setup page immediately shows a static "Submitted ✓" screen with a mDNS handoff link `http://<hostname>.local:5000/dashboard` and switch-network instructions
+9. AP shuts down 60s after successful connect (background)
+10. User switches phone to target WiFi, taps the link, dashboard loads
 
-**Key architecture:** BCM43438 single radio supports concurrent AP+STA via virtual interface. Both `uap0` (AP) and `wlan0` (station) share the same channel. `hostapd.conf` and `dnsmasq-hotspot.conf` bind to `uap0`. NetworkManager ignores `uap0` via `/etc/NetworkManager/conf.d/unmanaged-uap0.conf`.
+**Key architecture:** BCM43438 single radio supports concurrent AP+STA only when both interfaces share the same channel. `_get_target_channel(ssid)` scans the target's channel, `_set_hostapd_channel(n)` rewrites `hostapd.conf` and restarts hostapd before associating. `hostapd.conf` and `dnsmasq-hotspot.conf` bind to `uap0`. NetworkManager ignores `uap0` via `/etc/NetworkManager/conf.d/unmanaged-uap0.conf`. **Pre-v0.7.2 builds used poll-based confirmation of the connection from the setup page; that proved fragile under channel handover and was replaced with the deterministic mDNS handoff.** `/api/wifi/connect-status` endpoint still exists but is no longer used by the production setup UI.
+
+**Self-heal on every boot (v0.7.1+):** `fix_hotspot_configs()` in `app.py` mirrors the existing `fix_avahi_ipv6()` pattern. Idempotently strips CRLF from BeautiFi configs, symlinks `/etc/hostapd/hostapd.conf` and `/etc/dnsmasq.d/beautifi-hotspot.conf` to the BeautiFi versions, comments out stale `interface=wlan0` in `/etc/dnsmasq.conf`, and retires stale `/etc/dnsmasq.d/hotspot.conf`. Resolves a class of "AP fallback fails in the field" bugs caused by pre-v0.6.0 system config remnants and Windows-editor CRLF endings. `.gitattributes` pins LF for `.conf`/`.py`/`.sh`/`.service` so the CRLF class cannot recur.
+
+**`_get_wifi_interface()` (v0.7.2):** explicitly prefers `wlan0` and skips `uap0` when picking the station interface from `nmcli device` output. Without this, `uap0` was sometimes returned (non-deterministic enumeration), causing `nmcli` to try associating the AP interface to the target SSID and fail with misleading "Incorrect password" errors.
 
 ## Running the Device
 
@@ -590,8 +595,11 @@ Set up end-to-end OTA firmware delivery:
 | **v0.4.1** | Fix AAAA record publishing (`publish-aaaa-on-ipv4=no`), always restart avahi-daemon on boot | [GitHub Release](https://github.com/ghapster/beautifi-iot/releases/tag/v0.4.1) |
 | **v0.5.0** | Report local network IP in telemetry for miner dashboard "Local Access" link | [GitHub Release](https://github.com/ghapster/beautifi-iot/releases/tag/v0.5.0) |
 | **v0.6.0** | AP+STA concurrent WiFi provisioning with live status feedback; firmware version telemetry reporting | [GitHub Release](https://github.com/ghapster/beautifi-iot/releases/tag/v0.6.0) |
+| **v0.7.0** | Default `SIMULATION_MODE = False`; honest `simulation_mode` tagging on every sample; real BME680 actually used when present | [GitHub Release](https://github.com/ghapster/beautifi-iot/releases/tag/v0.7.0) |
+| **v0.7.1** | `fix_hotspot_configs()` self-heal for stale system configs (hostapd/dnsmasq symlinks, `interface=wlan0` cleanup, CRLF strip); `.gitattributes` pins LF on `.conf`/`.py`/`.sh`/`.service` | [GitHub Release](https://github.com/ghapster/beautifi-iot/releases/tag/v0.7.1) |
+| **v0.7.2** | `_get_wifi_interface()` prefers wlan0 / skips uap0; `connect_to_wifi()` flips state to "connected" before background hostname dance; dynamic hostapd channel matching for true AP+STA concurrent; setup UX rewrite — mDNS handoff link instead of fragile polling | [GitHub Release](https://github.com/ghapster/beautifi-iot/releases/tag/v0.7.2) |
 
-**Current firmware version: v0.6.0**
+**Current firmware version: v0.7.2** (released 2026-05-14)
 
 **OTA Flow (verified working):**
 - Manifest at: `https://raw.githubusercontent.com/ghapster/beautifi-iot/main/releases/latest.json`
@@ -695,7 +703,16 @@ IoT (every 12s) → POST /api/telemetry/stream {local_ip: "192.168.0.134"}
 | salonsafe-vite | `src/components/MinerDashboard.jsx` | Thread `local_ip` through to device objects |
 | salonsafe-vite | `src/components/DeviceDetailPanel.jsx` | Render clickable Local Access link |
 
-#### Current Device Status (Feb 8, 2026)
+#### Current Device Status (2026-05-14)
+
+| Device | Hostname | IP | Device ID | Firmware | Sensor | Status |
+|--------|----------|----|-----------|----------|--------|--------|
+| IoT #1 | beautifi-1 | 192.168.0.151 (local) | btfi-e8a6eb4a363fe54e | v0.7.1 → auto-OTA to v0.7.2 | **Real BME680** (simulation_mode: False) | ✅ Operational at office. Slated for Grace Nails deployment. |
+| IoT #2 | beautifi-2 | last known local | btfi-9c5263e883ee1b97 | unknown (offline) | Simulated (no BME680) | ⏳ Offline. Needs power-on for OTA. |
+| IoT #3 | beautifi-3 | last known offsite | btfi-5e93d18822a826b3 | unknown (offline) | Simulated (no BME680) | ⏳ Offline. Needs power-on for OTA. |
+| IoT #4 | beautifi-4 | 192.168.0.179 (bench) | btfi-49311ccf334d9d45 | v0.7.1 → auto-OTA to v0.7.2 | Simulated (no BME680) | ✅ Online. Returned from Grace Nails. Needs BME680 wiring before redeployment. |
+
+Pre-v0.7.0 status table preserved below — use as historical reference only.
 
 | Device | Hostname | IP | Device ID | Firmware | Network | Status |
 |--------|----------|----|-----------|----------|---------|--------|

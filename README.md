@@ -44,7 +44,7 @@ This installs everything:
 - Sets up systemd services
 - Auto-generates unique Ed25519 device identity
 
-### 3. WiFi Provisioning (AP+STA Concurrent Mode, v0.6.0+)
+### 3. WiFi Provisioning (AP+STA Concurrent Mode, v0.7.2+)
 
 If no WiFi is pre-configured, the device automatically enters AP mode on boot:
 
@@ -302,14 +302,14 @@ Returns all discoverable devices:
 }
 ```
 
-## Prototype Devices (Feb 2026)
+## Prototype Devices (2026-05-14)
 
-| Device | Hostname | Device ID | Firmware | Status |
-|--------|----------|-----------|----------|--------|
-| IoT #1 | beautifi-1 | btfi-e8a6eb4a363fe54e | v0.6.0 | ✅ Operational (BME680 real sensor) |
-| IoT #2 | beautifi-2 | btfi-9c5263e883ee1b97 | v0.6.0 | ✅ Operational |
-| IoT #3 | beautifi-3 | btfi-5e93d18822a826b3 | v0.6.0 | ✅ Operational (offsite) |
-| IoT #4 | beautifi-4 | btfi-49311ccf334d9d45 | Unknown | ⏳ Offline |
+| Device | Hostname | Device ID | Firmware | Sensor | Status |
+|--------|----------|-----------|----------|--------|--------|
+| IoT #1 | beautifi-1 | btfi-e8a6eb4a363fe54e | v0.7.1 → v0.7.2 | Real BME680 (simulation_mode: False) | ✅ Online; slated for Grace Nails |
+| IoT #2 | beautifi-2 | btfi-9c5263e883ee1b97 | unknown | Simulated (no BME680 wired) | ⏳ Offline |
+| IoT #3 | beautifi-3 | btfi-5e93d18822a826b3 | unknown | Simulated (no BME680 wired) | ⏳ Offline (offsite) |
+| IoT #4 | beautifi-4 | btfi-49311ccf334d9d45 | v0.7.1 → v0.7.2 | Simulated (no BME680 wired) | ✅ Online; returned from Grace Nails |
 
 All prototype devices have:
 - WiFi AP mode provisioning configured and tested (hostapd/dnsmasq)
@@ -360,6 +360,9 @@ See `CLAUDE.md` for detailed architecture, wiring diagrams, and implementation n
 
 | Version | Date | Changes |
 |---------|------|---------|
+| **v0.7.2** | May 14, 2026 | `_get_wifi_interface()` prefers wlan0; `connect_to_wifi()` flips state to "connected" before background hostname dance; dynamic hostapd channel matching for true AP+STA concurrent; setup UX rewrite to mDNS handoff link |
+| v0.7.1 | May 14, 2026 | `fix_hotspot_configs()` self-heal for stale system configs (hostapd/dnsmasq symlinks, `interface=wlan0` cleanup, CRLF strip); `.gitattributes` pins LF on `.conf`/`.py`/`.sh`/`.service` |
+| v0.7.0 | May 6, 2026 | Default `SIMULATION_MODE = False`; honest `simulation_mode` tag on every sample; real BME680 actually used when hardware present |
 | v0.6.0 | Feb 8, 2026 | AP+STA concurrent WiFi provisioning with live status feedback; firmware version telemetry reporting |
 | v0.5.0 | Feb 7, 2026 | Report local IP in telemetry for miner dashboard Local Access link |
 | v0.4.1 | Feb 7, 2026 | Fix AAAA record publishing, always restart avahi on boot |
