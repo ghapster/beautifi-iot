@@ -1,10 +1,10 @@
 {
-  "version": "0.7.1",
-  "release_date": "2026-05-14T16:47:00Z",
-  "download_url": "https://github.com/ghapster/beautifi-iot/releases/download/v0.7.1/beautifi-iot-v0.7.1.zip",
-  "file_hash": "e0556e1d3a2306ddd609db736150480bd72adbb5a4244c0e3ba47d4f9ba1d506",
-  "file_size": 148038,
-  "changelog": "Self-heal hostapd/dnsmasq configs (symlinks, CRLF strip, stale-config cleanup) so AP-fallback works reliably; .gitattributes pins LF endings on .conf/.py/.sh/.service files",
+  "version": "0.7.2",
+  "release_date": "2026-05-14T19:43:00Z",
+  "download_url": "https://github.com/ghapster/beautifi-iot/releases/download/v0.7.2/beautifi-iot-v0.7.2.zip",
+  "file_hash": "876ade082b1f127056b9a6134b9c95cb7ee99f62025034335877d9df65ee9376",
+  "file_size": 150078,
+  "changelog": "Setup-page UX rewrite (mDNS handoff link instead of fragile polling); _get_wifi_interface prefers wlan0 over uap0; connect state transitions before hostname dance; hostapd channel dynamically matches target SSID for true AP+STA concurrent on BCM43438",
   "min_version": "0.1.0",
   "signature": ""
 }
