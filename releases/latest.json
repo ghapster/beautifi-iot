@@ -1,10 +1,10 @@
 {
-  "version": "0.7.0",
-  "release_date": "2026-05-06T19:30:00Z",
-  "download_url": "https://github.com/ghapster/beautifi-iot/releases/download/v0.7.0/beautifi-iot-v0.7.0.zip",
-  "file_hash": "2e1b713a25808d0ab5c415d4fcf823da7861dacc2e2c0ff999b1cfb0a3200540",
-  "file_size": 147260,
-  "changelog": "Default to real BME680 sensor; tag samples with simulation_mode flag; honest fallback handling",
+  "version": "0.7.1",
+  "release_date": "2026-05-14T16:47:00Z",
+  "download_url": "https://github.com/ghapster/beautifi-iot/releases/download/v0.7.1/beautifi-iot-v0.7.1.zip",
+  "file_hash": "e0556e1d3a2306ddd609db736150480bd72adbb5a4244c0e3ba47d4f9ba1d506",
+  "file_size": 148038,
+  "changelog": "Self-heal hostapd/dnsmasq configs (symlinks, CRLF strip, stale-config cleanup) so AP-fallback works reliably; .gitattributes pins LF endings on .conf/.py/.sh/.service files",
   "min_version": "0.1.0",
   "signature": ""
 }
