@@ -1379,6 +1379,104 @@ def fix_avahi_ipv6():
         print(f"[SYSTEM] avahi check skipped: {e}")
 
 
+def fix_hotspot_configs():
+    """
+    Ensure hostapd and dnsmasq use the BeautiFi (uap0-aware) configs.
+
+    Two classes of bug we self-heal here, both reasons the AP fallback
+    appeared "intermittent" in field deployments:
+
+    1. CRLF in hostapd.conf / dnsmasq-hotspot.conf. Windows-edited or
+       Git-without-.gitattributes files reach the Pi with \\r\\n line
+       endings. hostapd then reads `driver=nl80211\\r` and reports
+       "invalid driver". Symptom: hostapd.service fails to start, no
+       SSID broadcast.
+
+    2. Stale pre-v0.6.0 system configs still targeting wlan0. The old
+       /etc/hostapd/hostapd.conf and /etc/dnsmasq.d/hotspot.conf were
+       not replaced when v0.6.0 introduced the uap0 virtual interface.
+       Symptom: hostapd tries to AP-mode wlan0 (which is now reserved
+       for station mode) and fails.
+
+    Idempotent — safe to run on every service start.
+    """
+    import os
+    import subprocess
+
+    beautifi_hostapd = "/home/pi/beautifi-iot/hostapd.conf"
+    beautifi_dnsmasq = "/home/pi/beautifi-iot/dnsmasq-hotspot.conf"
+    sys_hostapd = "/etc/hostapd/hostapd.conf"
+    sys_dnsmasq_drop = "/etc/dnsmasq.d/beautifi-hotspot.conf"
+    sys_dnsmasq_main = "/etc/dnsmasq.conf"
+    stale_dnsmasq_drop = "/etc/dnsmasq.d/hotspot.conf"
+
+    try:
+        # 1) Strip CRLF from the BeautiFi configs if present (defensive).
+        for f in (beautifi_hostapd, beautifi_dnsmasq):
+            try:
+                with open(f, 'rb') as fh:
+                    if b'\r\n' in fh.read():
+                        subprocess.run(["sudo", "sed", "-i", "s/\r$//", f],
+                                       timeout=5, check=True)
+                        print(f"[SYSTEM] Stripped CRLF from {f}")
+            except FileNotFoundError:
+                pass
+
+        # 2) /etc/hostapd/hostapd.conf -> BeautiFi config (uap0).
+        try:
+            current = os.path.realpath(sys_hostapd)
+        except OSError:
+            current = ""
+        if current != beautifi_hostapd:
+            if os.path.exists(sys_hostapd) and not os.path.islink(sys_hostapd):
+                subprocess.run(["sudo", "mv", sys_hostapd, sys_hostapd + ".pre-v07-backup"],
+                               timeout=5, check=False)
+            subprocess.run(["sudo", "ln", "-sf", beautifi_hostapd, sys_hostapd],
+                           timeout=5, check=True)
+            print(f"[SYSTEM] Linked {sys_hostapd} -> {beautifi_hostapd}")
+
+        # 3) /etc/dnsmasq.d/beautifi-hotspot.conf -> BeautiFi config.
+        try:
+            current = os.path.realpath(sys_dnsmasq_drop)
+        except OSError:
+            current = ""
+        if current != beautifi_dnsmasq:
+            subprocess.run(["sudo", "ln", "-sf", beautifi_dnsmasq, sys_dnsmasq_drop],
+                           timeout=5, check=True)
+            print(f"[SYSTEM] Linked {sys_dnsmasq_drop} -> {beautifi_dnsmasq}")
+
+        # 4) Comment out any active interface=wlan0 in /etc/dnsmasq.conf.
+        try:
+            with open(sys_dnsmasq_main, 'r') as fh:
+                main_content = fh.read()
+            if any(line.startswith("interface=wlan0")
+                   for line in main_content.splitlines()):
+                subprocess.run(["sudo", "sed", "-i",
+                                "s/^interface=wlan0/#interface=wlan0/",
+                                sys_dnsmasq_main],
+                               timeout=5, check=True)
+                print(f"[SYSTEM] Commented out interface=wlan0 in {sys_dnsmasq_main}")
+        except FileNotFoundError:
+            pass
+
+        # 5) Retire any stale /etc/dnsmasq.d/hotspot.conf with wlan0 binding.
+        # Move it outside dnsmasq.d entirely — the .bak suffix isn't in
+        # CONFIG_DIR's auto-skip list so renaming-in-place wouldn't help.
+        if os.path.exists(stale_dnsmasq_drop):
+            try:
+                with open(stale_dnsmasq_drop, 'r') as fh:
+                    if "wlan0" in fh.read():
+                        subprocess.run(["sudo", "mv", stale_dnsmasq_drop,
+                                        "/root/hotspot.conf.pre-v07-backup"],
+                                       timeout=5, check=True)
+                        print(f"[SYSTEM] Retired stale {stale_dnsmasq_drop}")
+            except (PermissionError, OSError):
+                pass
+
+    except Exception as e:
+        print(f"[SYSTEM] hotspot config check skipped: {e}")
+
+
 if __name__ == '__main__':
     print("=" * 60)
     print("  BeautiFi IoT - DUAN Proof-of-Air Device")
@@ -1392,6 +1490,8 @@ if __name__ == '__main__':
     # Fix avahi IPv6 if needed (ensures .local resolves to IPv4)
     if RUNNING_ON_PI:
         fix_avahi_ipv6()
+        # Self-heal hostapd / dnsmasq configs so AP fallback actually works
+        fix_hotspot_configs()
 
     # Check for pending OTA updates BEFORE starting fans
     # This ensures updates install on boot if device was off during previous update window
