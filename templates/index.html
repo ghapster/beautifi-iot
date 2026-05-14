@@ -321,7 +321,7 @@
 
       const btn = document.getElementById('connect-btn');
       btn.disabled = true;
-      btn.innerHTML = '<span class="spinner"></span> Connecting...';
+      btn.innerHTML = '<span class="spinner"></span> Submitting...';
       hideMessage();
 
       try {
@@ -334,8 +334,13 @@
         const data = await resp.json();
 
         if (data.status === 'connecting') {
-          showMessage('Connecting to ' + ssid + '...', 'info');
-          startConnectionPolling(ssid);
+          // The Pi has accepted the credentials and is now associating to
+          // the target WiFi. We don't try to confirm connection from the
+          // setup page because the single-radio AP+STA situation makes
+          // poll-based confirmation flaky during the handover. Just hand
+          // the user a deterministic .local link that resolves via mDNS
+          // once they're on the same network as the device.
+          showNextSteps(ssid);
         } else if (data.error) {
           showMessage(data.error, 'error');
           btn.disabled = false;
@@ -346,6 +351,34 @@
         btn.disabled = false;
         btn.textContent = 'Connect';
       }
+    }
+
+    function showNextSteps(ssid) {
+      const hostname = window.deviceHostname || 'beautifi-device';
+      const dashUrl = 'http://' + hostname + '.local:5000/dashboard';
+      const html =
+        '<div style="font-size:1.05em;line-height:1.6;">' +
+        '<strong style="font-size:1.15em;color:#00ff88;">Credentials submitted &check;</strong><br><br>' +
+        'Your device is connecting to <strong>' + ssid + '</strong>. ' +
+        'To open the control panel:' +
+        '<ol style="text-align:left;margin:12px 0 12px 20px;padding:0;">' +
+        '<li>Disconnect this phone/laptop from <strong>BeautiFi-Setup</strong></li>' +
+        '<li>Reconnect to <strong>' + ssid + '</strong></li>' +
+        '<li>Tap the link below</li>' +
+        '</ol>' +
+        '<a href="' + dashUrl + '" ' +
+        'style="display:inline-block;margin-top:8px;padding:12px 20px;background:#00ff88;color:#000;' +
+        'border-radius:6px;text-decoration:none;font-weight:bold;font-size:1.1em;">' +
+        'Open ' + hostname + ' control panel &rarr;</a><br>' +
+        '<small style="color:#888;display:block;margin-top:14px;">' +
+        'If the link does not work, your router admin page will list a device named ' +
+        '<strong>' + hostname + '</strong> with an IP like <code>192.168.x.x</code>. ' +
+        'Browse to <code>http://&lt;that-IP&gt;:5000/dashboard</code>.' +
+        '</small></div>';
+      showMessage(html, 'success');
+      const btn = document.getElementById('connect-btn');
+      btn.disabled = true;
+      btn.textContent = 'Submitted';
     }
 
     function startConnectionPolling(ssid) {

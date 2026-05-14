@@ -48,7 +48,7 @@ def _load_device_id():
 
 DEVICE_ID = _load_device_id()
 SITE_ID = "site-test-001"
-FIRMWARE_VERSION = "0.7.1"
+FIRMWARE_VERSION = "0.7.2"
 
 # ============================================
 # FAN SPECIFICATIONS (AC Infinity Cloudline S6)

@@ -72,15 +72,30 @@ class WiFiProvisioning:
             return False, str(e)
 
     def _get_wifi_interface(self) -> str:
-        """Get the WiFi interface name (usually wlan0)."""
+        """
+        Get the WiFi STATION interface name (usually wlan0).
+
+        Skips p2p devices and the uap0 virtual AP interface — those exist
+        as wifi-typed devices too, but using uap0 as the station interface
+        means nmcli tries to associate the AP to the target SSID, which
+        fails with misleading errors (often "Incorrect password" or
+        "secrets were required") even when the password is correct.
+        Prefer wlan0 if present.
+        """
         success, output = self._run_command(["nmcli", "-t", "-f", "DEVICE,TYPE", "device"])
+        candidates = []
         if success:
             for line in output.split('\n'):
                 if ':wifi' in line:
                     device = line.split(':')[0]
-                    # Skip p2p (peer-to-peer) devices - we want the real WiFi interface
-                    if not device.startswith('p2p'):
-                        return device
+                    if device.startswith('p2p') or device == 'uap0':
+                        continue
+                    candidates.append(device)
+        # Prefer wlan0 if available; otherwise first non-p2p, non-uap0 wifi device.
+        if 'wlan0' in candidates:
+            return 'wlan0'
+        if candidates:
+            return candidates[0]
         return "wlan0"  # Default fallback
 
     # ============================================
@@ -249,6 +264,58 @@ class WiFiProvisioning:
     # Client Mode (Connect to WiFi)
     # ============================================
 
+    def _get_target_channel(self, ssid: str) -> Optional[int]:
+        """
+        Find the WiFi channel a target SSID is broadcasting on.
+
+        Returns the channel as int, or None if the SSID isn't visible
+        in a scan. Used to match the AP's channel to the target before
+        associating, so AP+STA concurrent mode actually works on the
+        Pi 3B's single radio.
+        """
+        success, output = self._run_shell(
+            f"sudo nmcli -t -f SSID,CHAN dev wifi list ifname {self._interface}",
+            timeout=15,
+        )
+        if not success:
+            return None
+        for line in output.split('\n'):
+            # Format SSID:CHAN. SSIDs can technically contain colons, so
+            # split from the right.
+            parts = line.rsplit(':', 1)
+            if len(parts) == 2 and parts[0] == ssid:
+                try:
+                    return int(parts[1])
+                except ValueError:
+                    continue
+        return None
+
+    def _set_hostapd_channel(self, channel: int) -> bool:
+        """
+        Update hostapd.conf to use the given channel and restart hostapd.
+
+        Required for AP+STA concurrent mode on the BCM43438: both
+        interfaces must share the same channel or the AP goes silent
+        the moment wlan0 associates to a target on a different channel.
+        """
+        try:
+            self._run_shell(
+                f'sudo sed -i "s/^channel=.*/channel={channel}/" /etc/hostapd/hostapd.conf',
+                timeout=5,
+            )
+            self._run_shell("sudo systemctl restart hostapd", timeout=15)
+            time.sleep(2)
+            # hostapd restart may clear the AP IP; re-add to be safe.
+            self._run_shell(
+                f"sudo ip addr add 192.168.4.1/24 dev {self._ap_interface}",
+                timeout=5,
+            )
+            print(f"[WIFI] AP channel set to {channel}")
+            return True
+        except Exception as e:
+            print(f"[WIFI] Failed to set AP channel to {channel}: {e}")
+            return False
+
     def connect_to_wifi(self, ssid: str, password: str) -> Tuple[bool, str]:
         """
         Connect to a WiFi network on wlan0 while AP stays active on uap0.
@@ -269,6 +336,19 @@ class WiFiProvisioning:
         self._connection_ip = None
         self._connection_ssid = ssid
 
+        # Match the AP channel to the target SSID's channel BEFORE
+        # associating. The BCM43438 has one radio; AP+STA concurrent
+        # only works on a shared channel. Without this, the AP goes
+        # silent the instant wlan0 joins a network on a different
+        # channel, the phone loses BeautiFi-Setup, and the setup UI
+        # hangs even though the connection actually succeeded.
+        target_channel = self._get_target_channel(ssid)
+        if target_channel is not None:
+            print(f"[WIFI] Target '{ssid}' is on channel {target_channel}; matching AP channel")
+            self._set_hostapd_channel(target_channel)
+        else:
+            print(f"[WIFI] Target '{ssid}' channel not detected in scan; proceeding without channel match")
+
         # Ensure NetworkManager is managing wlan0
         self._run_shell("sudo nmcli dev set wlan0 managed yes")
         time.sleep(2)
@@ -280,21 +360,39 @@ class WiFiProvisioning:
         )
 
         if success:
-            # Wait for connection to establish
+            # Wait briefly for NetworkManager to finalize the connection.
             time.sleep(3)
-            # Set hostname in the connection so router shows device name
-            import socket
-            hostname = socket.gethostname()
-            self._run_shell(f'sudo nmcli connection modify "{ssid}" ipv4.dhcp-hostname "{hostname}"')
-            # Reconnect to apply hostname
-            self._run_shell(f'sudo nmcli connection down "{ssid}"')
-            time.sleep(1)
-            self._run_shell(f'sudo nmcli connection up "{ssid}"')
-            time.sleep(2)
             ip = self.get_ip_address()
-            print(f"[WIFI] Connected to {ssid}, IP: {ip}, Hostname: {hostname}")
+            print(f"[WIFI] Connected to {ssid}, IP: {ip}")
+            # Flip state to "connected" IMMEDIATELY so the setup page polling
+            # sees success within its 90s window. The hostname-application
+            # dance (nmcli down/up to refresh DHCP with our hostname) is a
+            # cosmetic feature for router visibility — do it in the background
+            # so the user gets the dashboard link fast.
             self._connection_state = "connected"
             self._connection_ip = ip
+
+            def _apply_hostname_background():
+                try:
+                    import socket
+                    hostname = socket.gethostname()
+                    self._run_shell(
+                        f'sudo nmcli connection modify "{ssid}" '
+                        f'ipv4.dhcp-hostname "{hostname}"',
+                        timeout=15,
+                    )
+                    # Restart the connection so DHCP picks up the hostname.
+                    # Briefly drops WiFi (~5-10s) but the setup page has
+                    # already declared success and the AP is still active.
+                    self._run_shell(f'sudo nmcli connection down "{ssid}"', timeout=15)
+                    time.sleep(1)
+                    self._run_shell(f'sudo nmcli connection up "{ssid}"', timeout=20)
+                    print(f"[WIFI] Hostname '{hostname}' applied to {ssid}")
+                except Exception as e:
+                    print(f"[WIFI] Hostname application skipped: {e}")
+
+            import threading
+            threading.Thread(target=_apply_hostname_background, daemon=True).start()
             return True, f"Connected to {ssid}. IP: {ip}"
         else:
             error_msg = self._parse_nmcli_error(output)
